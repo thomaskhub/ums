@@ -48,3 +48,7 @@ Thumbs.db
 *.mov
 *.wmv
 
+lib/ffmpeg/bin
+lib/ffmpeg/ffmpeg_build
+lib/ffmpeg/ffmpeg_sources
+
