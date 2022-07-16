@@ -1,0 +1,18 @@
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": ["${workspaceFolder}/**"],
+      "defines": [],
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "c17",
+      "cppStandard": "c++14",
+      "intelliSenseMode": "linux-clang-x64",
+      "configurationProvider": "ms-vscode.makefile-tools"
+      // "browse": {
+      //   "path": ["/home/thomas/Documents/ffmpeg/ffmpeg_build/include"]
+      // }
+    }
+  ],
+  "version": 4
+}

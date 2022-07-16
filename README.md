@@ -31,7 +31,26 @@ This project is based on the FFMPEG libraries which need to be compiled. A
 script compatible with Ubuntu 20.04 is available and needs to be executed
 first to build the right FFMPEG libraries and components from sourc code.
 
-´´´bash
+```bash
 cd ./lib/ffmpeg
 ./compile.sh
-´´´
+```
+
+## Setup visual studio code build / debug environment
+
+1. Install the following packets in visual studio code:
+
+- [C/C++](https://code.visualstudio.com/docs/languages/cpp)
+- [C/C++ Extension Pack](https://marketplace.visualstudio.com/items?itemName=ms-vscode.cpptools-extension-pack)
+- [VS Code Makefile tools](https://marketplace.visualstudio.com/items?itemName=ms-vscode.makefile-tools)
+
+You can refer to this link in order to configure the Makefile tool to run / debug the application
+[Makefile Tool Tutorial](https://devblogs.microsoft.com/cppblog/now-announcing-makefile-support-in-visual-studio-code/)
+
+2. Setup the Clang config for automatic formating
+
+```
+file -> settings -> Extensions --> C/C++ --> Clang_format_fallback Style = google
+```
+
+# System description
