@@ -1,0 +1,15 @@
+{
+  "files.associations": {
+    ".env": "dotenv",
+    "rtmpinput.h": "c",
+    "output.h": "c",
+    "inputswitch.h": "c"
+  },
+  "makefile.launchConfigurations": [
+    {
+      "cwd": "/home/thomas/Documents/isha-media/ums",
+      "binaryPath": "/home/thomas/Documents/isha-media/ums/ums",
+      "binaryArgs": []
+    }
+  ]
+}

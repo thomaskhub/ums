@@ -13,6 +13,7 @@
       "stopAtEntry": false,
       "cwd": "${workspaceFolder}",
       "miDebuggerPath": "/usr/bin/gdb",
+      "preLaunchTask": "makedebug",
       "setupCommands": [
         {
           "description": "Enable pretty-printing for gdb",

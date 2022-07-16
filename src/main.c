@@ -18,10 +18,73 @@
 */
 #include <libavutil/log.h>
 
+#include "config.h"
+#include "inputSwitch.h"
+#include "output.h"
+#include "rtmpInput.h"
+#include "utils.h"
+
+// TODO: these defines need to be passed to the main fucntion
+//       via command line argumens and should not be statically
+//       compiled within the code
+#define RTMP_IN_URL "rtmp://localhost/live/input"
+#define RTMP_OUT_URL "rtmp://localhost/live/output"
+#define preFiller "/home/thomas/Pictures/a.jpg"
+#define sessionFiller "/home/thomas/Pictures/a.jpg"
+#define postFiller "/home/thomas/Pictures/a.jpg"
+
+// Output configuration
+OutputCtxT vOutCfg[] = {{
+    .name = "main",
+    .bitrate = 2880000,
+    .url = RTMP_OUT_URL,
+    // TODO: add path for recording
+    .gop = 100,
+    .inWidth = VIDEO_WIDTH,
+    .inHeight = VIDEO_HEIGHT,
+    .format = VIDEO_PIX_FMT,
+    .timebase = {.num = VIDEO_TIMEBASE_NUM, .den = VIDEO_TIMEBASE_DEN},
+    .sampleAspectRatio = {.num = 1, .den = 1},
+}};
+
+// TODO: implement the audio processing
+void switchPushAFrame(AVFrame* frame) {}
+
+// Called when frame should be written to the output, push the frame to all
+// outputs modules which in turn will change bitrate, and resosluiont and
+// then output dash / hls. Stream 0 will also output rtmp or mpegts recording
+// if enabled.
+void switchPushVFrame(AVFrame* frame) {
+  int i, cfgLength;
+  cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
+  for (i = 0; i < cfgLength; i++) {
+    outputWriteVideoFrame(&vOutCfg[0], frame);
+  }
+}
+
 int main() {
-  int i = 0;
-  av_log_set_level(AV_LOG_DEBUG);
+  int ret, i, cfgLength;
+  // av_log_set_level(AV_LOG_DEBUG);
   av_log(NULL, AV_LOG_DEBUG, "Main::going to start the media server\n");
 
-  i++;
+  rtmpInputStart(RTMP_IN_URL, NULL, NULL);
+
+  cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
+  for (i = 0; i < cfgLength; i++) {
+    av_log(NULL, AV_LOG_DEBUG, "Going to setup output = %s\n", vOutCfg[i].name);
+    startOutput(&vOutCfg[i]);
+  }
+
+  // TODO: streamStart, sessionStart, sessionEnd also must come from cmd
+  // arguments
+  char *streamStart, *sessionStart, *sessionEnd;
+  getNowAsIso(&streamStart);
+  getNowAsIso(&sessionStart);
+  getNowAsIso(&sessionEnd);
+
+  ret = inputSwitchInit(switchPushVFrame, switchPushAFrame, rtmpIsRunning,
+                        preFiller, sessionFiller, postFiller, streamStart,
+                        sessionStart, sessionEnd);
+
+  rtmpInputJoin();
 }

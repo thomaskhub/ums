@@ -9,13 +9,31 @@ static uint32_t videoPTS = 0;
 void *_worker(void *args) {
   int rtmpStatus, fillerInProgress = 0;
   int64_t start, sleepTime, end, correction;
-  int i = 0;
+  int i = 0, ret;
   time_t now;
+  uint32_t vBufOff, vBufLen, vBufId;
+  AVFrame *vFrame;
 
   while (1) {
     rtmpStatus = checkRtmp();
-    if (rtmpStatus == 0) {
-      printf("Debug:: rtmp is running\n");
+    if (rtmpStatus == 1) {
+      ret = videoBufferPull(&rtmpInVBuffer, &vBufOff, &vBufLen, &vBufId);
+      if (ret < 0 && ret != AVERROR(EAGAIN)) {
+        av_log(NULL, AV_LOG_FATAL,
+               "inputSwitch::rtmp video buffer unknown error\n");
+        exit(1);
+      }
+
+      if (ret >= 0) {
+        for (i = 0; i < vBufLen; i++) {
+          vFrame = (&rtmpInVBuffer.doubleBuffer[vBufOff])[i];
+          vFrame->pts = videoPTS;
+          vFrame->pkt_dts = videoPTS;
+          vPush(vFrame);
+          videoPTS += VIDEO_PTS_OFF;
+        }
+        videoBufferDone(&rtmpInVBuffer, vBufId);
+      }
 
     } else {
       printf("Debug:: %li\n", av_gettime_relative() - start);
@@ -25,16 +43,23 @@ void *_worker(void *args) {
       for (i = 0; i < VIDEO_FRAME_RATE; i++) {
         now = time(NULL);
         if (now < filler.sessionStart) {
+          filler.vPreFiller->pts = videoPTS;
+          filler.vPreFiller->pkt_dts = videoPTS;
           vPush(filler.vPreFiller);
+          videoPTS += VIDEO_PTS_OFF;
 
           // aPush(filler.aPreFiller);
         } else if (now >= filler.sessionStart && now < filler.sessionEnd) {
           vPush(filler.vSessionFiller);
+          filler.vSessionFiller->pts = videoPTS;
+          filler.vSessionFiller->pkt_dts = videoPTS;
+          videoPTS += VIDEO_PTS_OFF;
           // aPush(filler.aSessionFiller);
         } else {
-          vPush(filler.vPostFiller);
           filler.vPostFiller->pts = videoPTS;
-          videoPTS += 40;
+          filler.vPostFiller->pkt_dts = videoPTS;
+          vPush(filler.vPostFiller);
+          videoPTS += VIDEO_PTS_OFF;
           // aPush(filler.aPostFiller);
         }
       }

@@ -1,10 +1,15 @@
 
 #include "rtmpInput.h"
 
-pthread_t inputThread;
-uint32_t runThread = 1;
-AVCodecContext *audioDecCtx, *videoDecCtx;
-RtmpWorkerData wData;
+static pthread_t inputThread;
+static uint32_t runThread = 1;
+static AVCodecContext *audioDecCtx, *videoDecCtx;
+static RtmpWorkerData wData;
+
+static VideoFilter vFilter;
+static int firstVideoFrame = 1;
+static int rtmpRunning = 0;
+static AVFrame *videoOutFrame;
 
 void rtmpInputStop() { runThread = 0; }
 void rtmpInputJoin() { pthread_join(inputThread, NULL); }
@@ -30,6 +35,8 @@ void *worker(void *data) {
   // this while loop is there to automatically reconnect to failing rtmp
   // input stream.
   while (runThread && ret >= 0) {
+    rtmpRunning = 0;
+    videoBufferReset(&rtmpInVBuffer);
     ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo);
     if (ret < 0) {
       printf("Could not open the input %i  url --> %s\n", ret,
@@ -38,6 +45,8 @@ void *worker(void *data) {
       ret = 0;  // make sure we restart the loop
       continue;
     }
+
+    rtmpRunning = 1;
 
     ret = openDecoder(&audioDecCtx, &audioDecoder, inputAudio);
     if (ret < 0) {
@@ -123,6 +132,45 @@ void *worker(void *data) {
           if (ret < 0 && ret != AVERROR(EAGAIN)) {
             goto freeVideoBuffer;
           }
+
+          // Take the frame, filter it, then push it into double buffer for
+          // creating one second chunks for further processing
+          if (ret >= 0) {
+            if (firstVideoFrame == 1) {
+              firstVideoFrame = 0;
+              ret = initVideoFilter(&vFilter, VIDEO_FILTER, videoFrame->width,
+                                    videoFrame->height, videoFrame->format,
+                                    videoDecCtx->time_base,
+                                    videoFrame->sample_aspect_ratio);
+              if (ret < 0) {
+                av_log(NULL, AV_LOG_ERROR,
+                       "rtmpInput::could not init video filter\n");
+                goto freeVideoBuffer;
+              }
+            }
+
+            ret = videoFilterPush(&vFilter, videoFrame);
+            if (ret < 0) {
+              av_log(NULL, AV_LOG_ERROR,
+                     "rtmpInput::could not push into filter\n");
+              goto freeVideoBuffer;
+            }
+
+            ret = videoFilterPull(&vFilter, &videoOutFrame);
+            if (ret < 0) {
+              av_log(NULL, AV_LOG_ERROR,
+                     "rtmpInput::could not pull from filter\n");
+              goto freeVideoBuffer;
+            }
+
+            ret = videoBufferPush(&rtmpInVBuffer, videoOutFrame, NULL);
+            if (ret < 0) {
+              av_log(NULL, AV_LOG_ERROR,
+                     "rtmpInput::we lost data!!! restart...\n");
+              goto freeVideoBuffer;
+            }
+          }
+
           if (ret >= 0 && wData.videoCallback) {
             // let someone else take care of the data
             wData.videoCallback(videoFrame, inputVideo->r_frame_rate);
@@ -143,6 +191,11 @@ void *worker(void *data) {
     closeCodec(&audioDecCtx);
   input:
     closeInput(&inFmtCtx);
+
+    if (firstVideoFrame == 0) {
+      videoFilterFree(&vFilter);
+      firstVideoFrame = 1;
+    }
     ret = 0;  // make sure we restart the loop
   }
 
@@ -156,16 +209,27 @@ void *worker(void *data) {
   printf("Input loop stoppped...\n");
 }
 
-int rtmpInputStart(char *url,
-                   void (*audioCallback)(AVFrame *frame, AVRational frameRate),
-                   void (*videoCallback)(AVFrame *frame,
-                                         AVRational frameRate)) {
-  printf("RTMP...\n");
+void rtmpInputStart(char *url,
+                    void (*audioCallback)(AVFrame *frame, AVRational frameRate),
+                    void (*videoCallback)(AVFrame *frame,
+                                          AVRational frameRate)) {
+  int ret;
+
   wData.url = url;
   wData.audioCallback = audioCallback;
   wData.videoCallback = videoCallback;
 
-  pthread_create(&inputThread, NULL, worker, NULL);
+  videoBufferInit(&rtmpInVBuffer, VIDEO_FRAME_RATE, VIDEO_PIX_FMT, VIDEO_WIDTH,
+                  VIDEO_HEIGHT);
 
-  return 0;
+  ret = getEmptyVideoFrame(&videoOutFrame, VIDEO_PIX_FMT, VIDEO_WIDTH,
+                           VIDEO_HEIGHT);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "rtmpInputStart::could not get empty frame\n");
+    exit(1);
+  }
+
+  pthread_create(&inputThread, NULL, worker, NULL);
 }
+
+int rtmpIsRunning() { return rtmpRunning; }

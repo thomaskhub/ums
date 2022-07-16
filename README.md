@@ -53,4 +53,17 @@ You can refer to this link in order to configure the Makefile tool to run / debu
 file -> settings -> Extensions --> C/C++ --> Clang_format_fallback Style = google
 ```
 
+3. Setup make file in vscode for debugging or production respectively
+   ![MakefileSettingsDebug](doc/images/makefile-debug.png)
+   ![MakefileSettingsDebug](doc/images/makefile-build.png)
+
+# Start RTMP docker
+
+```bash
+cd docker
+./build.sh
+
+docker run -d -p 1935:1935 --name nginx-rtmp nginx-rtmp
+```
+
 # System description
