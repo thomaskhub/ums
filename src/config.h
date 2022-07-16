@@ -29,6 +29,8 @@
 #define VIDEO_TIMEBASE_DEN 1000
 #define VIDEO_PTS_OFF (uint32_t)(VIDEO_TIMEBASE_DEN / VIDEO_FRAME_RATE)
 #define VIDEO_PIX_FMT AV_PIX_FMT_YUV420P
-#define VIDEO_FILTER "scale=1280:720,format=yuv420p"
+#define FILLER_VIDEO_FILTER "scale=1280:720,format=yuv420p"
+#define RTMPIN_VIDEO_FILTER "scale=1280:720,format=yuv420p,fps=fps=25"
+// #define RTMPIN_VIDEO_FILTER "fps=fps=25"
 
 #endif

@@ -91,7 +91,7 @@ int prepareVideoFiller(char *path, AVFrame **frame) {
     return ret;
   }
 
-  ret = initVideoFilter(&vFilter, VIDEO_FILTER, imgFrame->width,
+  ret = initVideoFilter(&vFilter, FILLER_VIDEO_FILTER, imgFrame->width,
                         imgFrame->height, VIDEO_PIX_FMT, timebase, aspectRatio);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not init video filter\n");

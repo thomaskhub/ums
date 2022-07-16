@@ -67,3 +67,19 @@ docker run -d -p 1935:1935 --name nginx-rtmp nginx-rtmp
 ```
 
 # System description
+
+**Work in progress**
+![System](./doc/images/media-platform-ums.jpg)
+
+- System is connected to an rtmp server
+- the rtmp input is first normalized to 720p with 25fps and YUV420p pixel format
+- then the rtmp input video is sliced into 1 second chunks
+  - 1 seconds chunk to allow easy switching between filler videos and RTMP input as AV sync will be easy to maintain
+- the rtmp inpuseSwitch will read the rtmp chunk buffer and forward the frames to the output modules.
+  - If rtmp input goes down the swith uses preloaded frames from a jpg file instead so that stream never interrupts.
+  - three different fillers are being played depending on the wallclock time and the event configuration
+- the main output module will forward the video files to another RMTP server (16-07-2022 Implemented until here)
+  - it can also optionaly store the video chunks in a MPEGTS file
+  - and it also forwards it the the Dash muxer
+- As Dash/HLS are ABR protocols each output needs to create different bandwidth and resolutions.
+  - x264 encoder is implemented in the output.c file.

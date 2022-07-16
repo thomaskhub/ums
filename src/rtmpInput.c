@@ -31,6 +31,7 @@ void *worker(void *data) {
   AVPacket rtmpPacket;
   AVCodec *audioDecoder, *videoDecoder;
   AVFrame *videoFrame, *audioFrame;
+  AVRational tbase;
 
   // this while loop is there to automatically reconnect to failing rtmp
   // input stream.
@@ -138,9 +139,9 @@ void *worker(void *data) {
           if (ret >= 0) {
             if (firstVideoFrame == 1) {
               firstVideoFrame = 0;
-              ret = initVideoFilter(&vFilter, VIDEO_FILTER, videoFrame->width,
-                                    videoFrame->height, videoFrame->format,
-                                    videoDecCtx->time_base,
+              ret = initVideoFilter(&vFilter, RTMPIN_VIDEO_FILTER,
+                                    videoFrame->width, videoFrame->height,
+                                    videoFrame->format, inputVideo->time_base,
                                     videoFrame->sample_aspect_ratio);
               if (ret < 0) {
                 av_log(NULL, AV_LOG_ERROR,
@@ -158,6 +159,12 @@ void *worker(void *data) {
 
             ret = videoFilterPull(&vFilter, &videoOutFrame);
             if (ret < 0) {
+              if (ret == AVERROR(EAGAIN)) {
+                continue;
+                // more frames are needed by filter to create an out
+                // frame
+              }
+
               av_log(NULL, AV_LOG_ERROR,
                      "rtmpInput::could not pull from filter\n");
               goto freeVideoBuffer;
