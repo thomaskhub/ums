@@ -40,7 +40,8 @@ void *worker(void *data) {
     videoBufferReset(&rtmpInVBuffer);
     ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo);
     if (ret < 0) {
-      printf("Could not open the input %i  url --> %s\n", ret,
+      av_log(NULL, AV_LOG_DEBUG,
+             "rtmpInput::Could not open rtmp input %i  url --> %s\n", ret,
              (char *)wData.url);
       sleep(3);
       ret = 0;  // make sure we restart the loop

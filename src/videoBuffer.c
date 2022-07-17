@@ -47,7 +47,8 @@ int videoBufferPush(VideoBuffer *buf, AVFrame *frame, PushHandler handler) {
 
   if (buf->bufOffset[0] >= buf->frameCount &&
       buf->bufOffset[1] >= buf->frameCount) {
-    printf("Warning!!!! We lost data both double buffers are full...\n");
+    av_log(NULL, AV_LOG_WARNING, "videoBuffer::double buffer overflow!\n");
+
     return AVERROR(EBUSY);
   }
 

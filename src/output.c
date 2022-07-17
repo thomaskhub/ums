@@ -1,5 +1,67 @@
 #include "output.h"
 
+static int openRtmp(OutputCtxT* data) {
+  int ret;
+  ret = openOutput(&data->rtmpOutCtx, data->url, &data->outAudioRtmp,
+                   &data->outVideoRtmp, "flv");
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "openRtmp::could not open rtmp\n");
+    goto end;
+  }
+
+  ret = avcodec_parameters_from_context(data->outVideoRtmp->codecpar,
+                                        data->videoEncCtx);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR,
+           "openRtmp::could not setup video codec params\n");
+    goto closeOutput;
+  }
+
+  ret = avformat_write_header(data->rtmpOutCtx, NULL);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "openRtmp::could not write rtmp out header\n");
+    goto closeOutput;
+  }
+
+  return 0;
+
+closeOutput:
+  closeOutput(&data->rtmpOutCtx);
+end:
+  data->rtmpOutCtx = NULL;
+  return ret;
+}
+
+static int openMpegtsRecording(OutputCtxT* data) {
+  int ret;
+  ret = openOutput(&data->recCtx, data->path, &data->outAudioRec,
+                   &data->outVideoRec, "mpegts");
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "openRec::could not open recoding output\n");
+    goto end;
+  }
+
+  ret = avcodec_parameters_from_context(data->outVideoRec->codecpar,
+                                        data->videoEncCtx);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "openRec::could not open recoding output\n");
+    goto closeOutput;
+  }
+
+  ret = avformat_write_header(data->recCtx, NULL);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "openRec::could not write rtmp out header\n");
+    goto closeOutput;
+  }
+  return 0;
+
+closeOutput:
+  closeOutput(&data->rtmpOutCtx);
+end:
+  data->recCtx = NULL;
+  return ret;
+}
+
 int startOutput(OutputCtxT* data) {
   int ret;
 
@@ -9,8 +71,8 @@ int startOutput(OutputCtxT* data) {
     return ret;
   }
 
-  data->videoEncCtx->height = data->inHeight;
-  data->videoEncCtx->width = data->inWidth;
+  data->videoEncCtx->height = data->outHeight;
+  data->videoEncCtx->width = data->outWidth;
   data->videoEncCtx->sample_aspect_ratio = data->sampleAspectRatio;
   data->videoEncCtx->pix_fmt = data->format;
   data->videoEncCtx->time_base = data->timebase;
@@ -31,78 +93,137 @@ int startOutput(OutputCtxT* data) {
     closeCodec;
   }
 
+  data->packet = av_packet_alloc();
+  if (!data->packet) {
+    av_log(NULL, AV_LOG_ERROR, "output:: not able to allocate packet\n");
+    goto closeCodec;
+  }
+
   if (data->url) {
-    // setup rtmp output
-    ret = openOutput(&data->rtmpOutCtx, data->url, &data->outAudioRtmp,
-                     &data->outVideoRtmp, "flv");
+    // TODO: the rtmp output should be started in a thread
+    //  to repeadetly try to connect to output in case of connection
+    //  issue.
+    data->rtmpOutCtx = NULL;
+    ret = openRtmp(data);
     if (ret < 0) {
-      printf("Could not open output file abort...\n");
-      goto closeCodec;
+      av_log(NULL, AV_LOG_WARNING,
+             "output::not able to stream to rtmp output\n");
     }
-
-    ret = avcodec_parameters_from_context(data->outVideoRtmp->codecpar,
-                                          data->videoEncCtx);
-    if (ret < 0) {
-      printf("could not setup video output params\n");
-      goto closeCodec;
-    }
-
-    // data->outVideoRtmp->time_base = data->outVideoRtmp->time_base;
-    data->outRtmpPacket = av_packet_alloc();
-    if (!data->outRtmpPacket) {
-      printf("could no allocated packet for rtmp output...\n");
-      goto closeCodec;
-    }
-
-    ret = avformat_write_header(data->rtmpOutCtx, NULL);
-    if (ret < 0) {
-      printf("could not write header for rtmp output...\n");
-      goto closeCodec;
-    }
-    av_dump_format(data->rtmpOutCtx, 0, "", 1);
   }
 
   if (data->path) {
-    // setup TS recording
+    data->recCtx = NULL;
+    ret = openMpegtsRecording(data);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_WARNING,
+             "output::not able to write recording file\n");
+    }
+  }
+
+  if (data->inWidth != data->outWidth || data->inHeight != data->outHeight) {
+    data->filterEna = 1;
+    snprintf(data->filterDesc, 128, "scale=%d:%d", data->outWidth,
+             data->outHeight);
+
+    ret = initVideoFilter(&data->vFilter, data->filterDesc, data->inWidth,
+                          data->inHeight, data->format, data->timebase,
+                          data->sampleAspectRatio);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR, "output::could not init video filter\n");
+      goto closeRecordingOut;
+    }
+
+    ret = getEmptyVideoFrame(&data->encoderFrame, data->format, data->outWidth,
+                             data->outHeight);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not create empty video\n");
+      goto closeRecordingOut;
+    }
+
+  } else {
+    data->filterEna = 0;
   }
 
   return 0;
+
+closeRecordingOut:
+  if (data->path && data->recCtx) {
+    closeOutput(&data->recCtx);
+  };
 closeRtmpOut:
-  closeOutput(&data->rtmpOutCtx);
+  if (data->url && data->rtmpOutCtx) {
+    closeOutput(&data->rtmpOutCtx);
+  };
 closeCodec:
   closeCodec(&data->videoEncCtx);
 
-  if (data->outRtmpPacket) {
-    av_packet_free(&data->outRtmpPacket);
+  if (data->packet) {
+    av_packet_free(&data->packet);
   }
   return ret;
 }
 
-// Todo: this function only works with the rtmp output.... bcause we are using
-// outVideoRtmp
 void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
   int ret;
-  ret = avcodec_send_frame(data->videoEncCtx, frame);
-  if (ret < 0) {
-    printf("Could not copy frame to encoder...\n");
-    exit(1);
+  AVPacket *recPacket, *rtmpPacket;
+
+  if (data->filterEna) {
+    ret = videoFilterPush(&data->vFilter, frame);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR, "output::could not push into filter\n");
+      return;
+    }
+
+    ret = videoFilterPull(&data->vFilter, &data->encoderFrame);
+    if (ret < 0) {
+      if (ret == AVERROR(EAGAIN)) {
+        return;
+      }
+
+      av_log(NULL, AV_LOG_ERROR, "output::could not pull from filter\n");
+      return;
+    }
+
+    ret = avcodec_send_frame(data->videoEncCtx, data->encoderFrame);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR, "output::Could not copy frame to encoder\n");
+      exit(1);
+    }
+  } else {
+    ret = avcodec_send_frame(data->videoEncCtx, frame);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR, "output::Could not copy frame to encoder\n");
+      exit(1);
+    }
   }
 
   while (ret >= 0) {
-    ret = avcodec_receive_packet(data->videoEncCtx, data->outRtmpPacket);
+    ret = avcodec_receive_packet(data->videoEncCtx, data->packet);
     if (ret == 0) {
-      // videoEncPacket->stream_index = outputVideo->index;
+      if (data->url && data->rtmpOutCtx) {
+        // handle rtmp output if enabled
+        rtmpPacket = av_packet_clone(data->packet);
 
-      av_packet_rescale_ts(data->outRtmpPacket, data->timebase,
-                           data->outVideoRtmp->time_base);  //
+        av_packet_rescale_ts(rtmpPacket, data->timebase,
+                             data->outVideoRtmp->time_base);
+        ret = av_interleaved_write_frame(data->rtmpOutCtx, rtmpPacket);
+      }
 
-      ret = av_interleaved_write_frame(data->rtmpOutCtx, data->outRtmpPacket);
+      if (data->path && data->recCtx) {
+        // handle MPEGTS recording if enabled
+        recPacket = av_packet_clone(data->packet);
+
+        av_packet_rescale_ts(recPacket, data->timebase,
+                             data->outVideoRec->time_base);
+
+        ret = av_interleaved_write_frame(data->recCtx, recPacket);
+      }
     }
     if (ret < 0) {
       break;
     }
   }
-  av_packet_unref(data->outRtmpPacket);
+  av_packet_unref(data->packet);
 }
 
 // void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame) {

@@ -3,7 +3,9 @@
     ".env": "dotenv",
     "rtmpinput.h": "c",
     "output.h": "c",
-    "inputswitch.h": "c"
+    "inputswitch.h": "c",
+    "typeinfo": "c",
+    "config.h": "c"
   },
   "makefile.launchConfigurations": [
     {

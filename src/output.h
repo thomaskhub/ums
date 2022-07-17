@@ -19,7 +19,10 @@
 #ifndef __OUTPUT__
 #define __OUTPUT__
 
+#include "config.h"
+#include "filters.h"
 #include "mux.h"
+#include "utils.h"
 typedef struct {
   const char* name;
   int64_t bitrate;
@@ -28,16 +31,33 @@ typedef struct {
   int gop;
   int inWidth;
   int inHeight;
+  int outWidth;
+  int outHeight;
   int format;
+
+  /**
+   * @brief Dash output stream index
+   */
+  int streamIdx;
+  uint8_t filterEna;
+
   AVRational timebase;
   AVFormatContext* rtmpOutCtx;
   AVRational sampleAspectRatio;
 
-  AVStream* outVideoStream;  // output video stream that can be used by others
+  AVFormatContext* recCtx;
+  AVStream *outVideoRec, *outAudioRec;
+  VideoFilter vFilter;
+  char filterDesc[128];
+
+  // AVStream* outVideoStream;  // output video stream that can be used by
+  // others
   AVStream *outVideoRtmp, *outAudioRtmp;
   AVCodecContext* videoEncCtx;
-  AVPacket* outRtmpPacket;
   AVCodec* videoEncoder;
+  AVPacket* packet;
+  AVFrame* encoderFrame;
+
 } OutputCtxT;
 
 /**
