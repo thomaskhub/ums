@@ -20,8 +20,6 @@
 #ifndef __MEDIA_CONFIG___
 #define __MEDIA_CONFIG___
 
-#include "output.h"
-
 #define VIDEO_WIDTH 1280
 #define VIDEO_HEIGHT 720
 #define VIDEO_FRAME_RATE 25

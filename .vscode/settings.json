@@ -5,7 +5,11 @@
     "output.h": "c",
     "inputswitch.h": "c",
     "typeinfo": "c",
-    "config.h": "c"
+    "config.h": "c",
+    "dash.h": "c",
+    "utils.h": "c",
+    "rational.h": "c",
+    "paths.h": "c"
   },
   "makefile.launchConfigurations": [
     {

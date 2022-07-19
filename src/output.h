@@ -19,10 +19,14 @@
 #ifndef __OUTPUT__
 #define __OUTPUT__
 
+#include <pthread.h>
+
 #include "config.h"
+#include "dash.h"
 #include "filters.h"
 #include "mux.h"
 #include "utils.h"
+
 typedef struct {
   const char* name;
   int64_t bitrate;
@@ -34,6 +38,7 @@ typedef struct {
   int outWidth;
   int outHeight;
   int format;
+  enum AVMediaType type;
 
   /**
    * @brief Dash output stream index
@@ -57,6 +62,8 @@ typedef struct {
   AVCodec* videoEncoder;
   AVPacket* packet;
   AVFrame* encoderFrame;
+
+  DashCtxT* dashCtx;
 
 } OutputCtxT;
 

@@ -23,6 +23,7 @@
 #include <libavutil/mathematics.h>
 #include <libavutil/rational.h>
 #include <libavutil/time.h>
+#include <string.h>
 #include <time.h>
 
 #include "mux.h"
@@ -57,4 +58,6 @@ int writeFrameToJpeg(AVFrame *frame, char *path);
 
 time_t isoTimeToEpoch(char *isoTimestamp);
 int getNowAsIso(char **isoTimeString);
+int cleanDir(const char *path);
+int mkdirP(const char *path);
 #endif

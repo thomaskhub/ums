@@ -291,3 +291,23 @@ int getNowAsIso(char **isoTimeString) {
                  minOff);
   return ret;
 }
+
+int cleanDir(const char *path) {
+  char cmd[1024];
+  cmd[0] = 0;
+  strcat(cmd, "exec rm -r ");
+  strcat(cmd, path);
+  strcat(cmd, "/* > /dev/null");
+  printf("%s\n", cmd);
+  return system(cmd);
+}
+
+int mkdirP(const char *path) {
+  char cmd[1024];
+  cmd[0] = 0;
+  strcat(cmd, "exec mkdir -p ");
+  strcat(cmd, path);
+  strcat(cmd, " > /dev/null");
+  printf("%s\n", cmd);
+  return system(cmd);
+}

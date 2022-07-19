@@ -1,39 +1,52 @@
 #include "output.h"
 
-static int openRtmp(OutputCtxT* data) {
-  int ret;
-  ret = openOutput(&data->rtmpOutCtx, data->url, &data->outAudioRtmp,
-                   &data->outVideoRtmp, "flv");
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "openRtmp::could not open rtmp\n");
-    goto end;
+static pthread_t threadOpenRtmp;
+static uint8_t rtmpOutRunning = 0;
+
+static void* openRtmp(void* user) {
+  while (1) {
+    int ret;
+    OutputCtxT* data = (OutputCtxT*)user;
+    data->rtmpOutCtx = NULL;
+
+    // if output is not available retry until it becomes available
+    do {
+      ret = openOutput(&data->rtmpOutCtx, data->url, &data->outAudioRtmp,
+                       &data->outVideoRtmp, "flv");
+      if (ret < 0) {
+        av_log(NULL, AV_LOG_ERROR, "openRtmp::could not open rtmp\n");
+      }
+      sleep(3);
+    } while (ret < 0);
+
+    ret = avcodec_parameters_from_context(data->outVideoRtmp->codecpar,
+                                          data->videoEncCtx);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR,
+             "openRtmp::could not setup video codec params\n");
+      goto closeOutput;
+    }
+
+    ret = avformat_write_header(data->rtmpOutCtx, NULL);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR, "openRtmp::could not write rtmp out header\n");
+      goto closeOutput;
+    }
+
+    rtmpOutRunning = 1;
+    return NULL;
+
+  closeOutput:
+    closeOutput(&data->rtmpOutCtx);
+  end:
+    data->rtmpOutCtx = NULL;
+    rtmpOutRunning = 0;
   }
-
-  ret = avcodec_parameters_from_context(data->outVideoRtmp->codecpar,
-                                        data->videoEncCtx);
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR,
-           "openRtmp::could not setup video codec params\n");
-    goto closeOutput;
-  }
-
-  ret = avformat_write_header(data->rtmpOutCtx, NULL);
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "openRtmp::could not write rtmp out header\n");
-    goto closeOutput;
-  }
-
-  return 0;
-
-closeOutput:
-  closeOutput(&data->rtmpOutCtx);
-end:
-  data->rtmpOutCtx = NULL;
-  return ret;
 }
 
 static int openMpegtsRecording(OutputCtxT* data) {
   int ret;
+
   ret = openOutput(&data->recCtx, data->path, &data->outAudioRec,
                    &data->outVideoRec, "mpegts");
   if (ret < 0) {
@@ -64,6 +77,15 @@ end:
 
 int startOutput(OutputCtxT* data) {
   int ret;
+
+  data->gop = 100;
+  data->inWidth = VIDEO_WIDTH;
+  data->inHeight = VIDEO_HEIGHT;
+  data->format = VIDEO_PIX_FMT;
+  data->timebase.num = VIDEO_TIMEBASE_NUM;
+  data->timebase.den = VIDEO_TIMEBASE_DEN;
+  data->sampleAspectRatio.den = 1;
+  data->sampleAspectRatio.num = 1;
 
   ret = initEncoder(&data->videoEncCtx, &data->videoEncoder, AV_CODEC_ID_H264);
   if (ret < 0) {
@@ -100,14 +122,10 @@ int startOutput(OutputCtxT* data) {
   }
 
   if (data->url) {
-    // TODO: the rtmp output should be started in a thread
-    //  to repeadetly try to connect to output in case of connection
-    //  issue.
-    data->rtmpOutCtx = NULL;
-    ret = openRtmp(data);
+    ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void*)data);
     if (ret < 0) {
       av_log(NULL, AV_LOG_WARNING,
-             "output::not able to stream to rtmp output\n");
+             "output::not able to start rtmpOut thread\n");
     }
   }
 
@@ -165,7 +183,7 @@ closeCodec:
 
 void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
   int ret;
-  AVPacket *recPacket, *rtmpPacket;
+  AVPacket *recPacket, *rtmpPacket, *dashPacket;
 
   if (data->filterEna) {
     ret = videoFilterPush(&data->vFilter, frame);
@@ -200,13 +218,23 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
   while (ret >= 0) {
     ret = avcodec_receive_packet(data->videoEncCtx, data->packet);
     if (ret == 0) {
-      if (data->url && data->rtmpOutCtx) {
+      if (data->url && data->rtmpOutCtx && rtmpOutRunning) {
         // handle rtmp output if enabled
         rtmpPacket = av_packet_clone(data->packet);
 
         av_packet_rescale_ts(rtmpPacket, data->timebase,
                              data->outVideoRtmp->time_base);
         ret = av_interleaved_write_frame(data->rtmpOutCtx, rtmpPacket);
+        if (ret < 0) {
+          // if we have some error on rtmp output restart it
+          rtmpOutRunning = 0;
+          ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void*)data);
+          if (ret < 0) {
+            av_log(NULL, AV_LOG_WARNING,
+                   "output::not able to start rtmpOut thread\n");
+          }
+        }
+        av_packet_unref(rtmpPacket);
       }
 
       if (data->path && data->recCtx) {
@@ -217,7 +245,19 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
                              data->outVideoRec->time_base);
 
         ret = av_interleaved_write_frame(data->recCtx, recPacket);
+        av_packet_unref(recPacket);
       }
+
+      // always push dash/hls cannot be disabled
+      dashPacket = av_packet_clone(data->packet);
+      dashPacket->stream_index = data->streamIdx;
+
+      av_packet_rescale_ts(
+          dashPacket, data->timebase,
+          data->dashCtx->dashStreams[data->streamIdx]->time_base);
+
+      dashWritePacket(data->dashCtx, dashPacket);
+      av_packet_unref(dashPacket);
     }
     if (ret < 0) {
       break;
