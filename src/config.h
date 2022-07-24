@@ -20,8 +20,6 @@
 #ifndef __MEDIA_CONFIG___
 #define __MEDIA_CONFIG___
 
-#include "output.h"
-
 #define VIDEO_WIDTH 1280
 #define VIDEO_HEIGHT 720
 #define VIDEO_FRAME_RATE 25
@@ -31,6 +29,5 @@
 #define VIDEO_PIX_FMT AV_PIX_FMT_YUV420P
 #define FILLER_VIDEO_FILTER "scale=1280:720,format=yuv420p"
 #define RTMPIN_VIDEO_FILTER "scale=1280:720,format=yuv420p,fps=fps=25"
-// #define RTMPIN_VIDEO_FILTER "fps=fps=25"
 
 #endif

@@ -92,4 +92,6 @@ void videoBufferReset(VideoBuffer *buf);
 int videoBufferPull(VideoBuffer *buf, uint32_t *off, uint32_t *len,
                     uint32_t *bufId);
 
+void videoBufferClose(VideoBuffer *buf);
+
 #endif

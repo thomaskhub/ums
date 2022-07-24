@@ -9,7 +9,6 @@ static RtmpWorkerData wData;
 static VideoFilter vFilter;
 static int firstVideoFrame = 1;
 static int rtmpRunning = 0;
-static AVFrame *videoOutFrame;
 
 void rtmpInputStop() { runThread = 0; }
 void rtmpInputJoin() { pthread_join(inputThread, NULL); }
@@ -32,15 +31,25 @@ void *worker(void *data) {
   AVCodec *audioDecoder, *videoDecoder;
   AVFrame *videoFrame, *audioFrame;
   AVRational tbase;
+  AVFrame *videoOutFrame;
+
+  ret = getEmptyVideoFrame(&videoOutFrame, VIDEO_PIX_FMT, VIDEO_WIDTH,
+                           VIDEO_HEIGHT);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "rtmpInputStart::could not get empty frame\n");
+    exit(1);
+  }
 
   // this while loop is there to automatically reconnect to failing rtmp
   // input stream.
   while (runThread && ret >= 0) {
+    printf("rtmp in the loop\n");
     rtmpRunning = 0;
     videoBufferReset(&rtmpInVBuffer);
     ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo);
     if (ret < 0) {
-      printf("Could not open the input %i  url --> %s\n", ret,
+      av_log(NULL, AV_LOG_DEBUG,
+             "rtmpInput::Could not open rtmp input %i  url --> %s\n", ret,
              (char *)wData.url);
       sleep(3);
       ret = 0;  // make sure we restart the loop
@@ -205,14 +214,16 @@ void *worker(void *data) {
     }
     ret = 0;  // make sure we restart the loop
   }
-
+  printf("rtmp out of the loop\n");
   // Free all resource if rtmp input is stopepd which should never happen but
   // just in case
   av_frame_free(&videoFrame);
   av_frame_free(&audioFrame);
+  av_frame_free(&videoOutFrame);
   closeCodec(&audioDecCtx);
   closeCodec(&videoDecCtx);
   closeInput(&inFmtCtx);
+  videoBufferClose(&rtmpInVBuffer);
   printf("Input loop stoppped...\n");
 }
 
@@ -228,13 +239,6 @@ void rtmpInputStart(char *url,
 
   videoBufferInit(&rtmpInVBuffer, VIDEO_FRAME_RATE, VIDEO_PIX_FMT, VIDEO_WIDTH,
                   VIDEO_HEIGHT);
-
-  ret = getEmptyVideoFrame(&videoOutFrame, VIDEO_PIX_FMT, VIDEO_WIDTH,
-                           VIDEO_HEIGHT);
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "rtmpInputStart::could not get empty frame\n");
-    exit(1);
-  }
 
   pthread_create(&inputThread, NULL, worker, NULL);
 }

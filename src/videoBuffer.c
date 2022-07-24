@@ -47,7 +47,8 @@ int videoBufferPush(VideoBuffer *buf, AVFrame *frame, PushHandler handler) {
 
   if (buf->bufOffset[0] >= buf->frameCount &&
       buf->bufOffset[1] >= buf->frameCount) {
-    printf("Warning!!!! We lost data both double buffers are full...\n");
+    av_log(NULL, AV_LOG_WARNING, "videoBuffer::double buffer overflow!\n");
+
     return AVERROR(EBUSY);
   }
 
@@ -142,4 +143,11 @@ int videoBufferPull(VideoBuffer *buf, uint32_t *off, uint32_t *len,
     }
   }
   return AVERROR(AVERROR_UNKNOWN);
+}
+
+void videoBufferClose(VideoBuffer *buf) {
+  int i;
+  for (i = 0; i < 2 * buf->frameCount; i++) {
+    av_frame_free(&buf->doubleBuffer[i]);
+  }
 }

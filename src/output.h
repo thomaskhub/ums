@@ -19,7 +19,14 @@
 #ifndef __OUTPUT__
 #define __OUTPUT__
 
+#include <pthread.h>
+
+#include "config.h"
+#include "dash.h"
+#include "filters.h"
 #include "mux.h"
+#include "utils.h"
+
 typedef struct {
   const char* name;
   int64_t bitrate;
@@ -28,28 +35,61 @@ typedef struct {
   int gop;
   int inWidth;
   int inHeight;
+  int outWidth;
+  int outHeight;
   int format;
+  enum AVMediaType type;
+
+  /**
+   * @brief Dash output stream index
+   */
+  int streamIdx;
+  uint8_t filterEna;
   AVRational timebase;
   AVFormatContext* rtmpOutCtx;
   AVRational sampleAspectRatio;
-
-  AVStream* outVideoStream;  // output video stream that can be used by others
+  AVFormatContext* recCtx;
+  AVStream *outVideoRec, *outAudioRec;
+  VideoFilter vFilter;
+  char filterDesc[128];
   AVStream *outVideoRtmp, *outAudioRtmp;
   AVCodecContext* videoEncCtx;
-  AVPacket* outRtmpPacket;
   AVCodec* videoEncoder;
+  AVPacket* packet;
+  AVFrame* encoderFrame;
+  DashCtxT* dashCtx;
 } OutputCtxT;
 
 /**
- * @brief take the inptu audio frame and push it through
- * the encoder and then either into rtmp out, recodring out
+ * @brief take the input audio frame and push it through
+ * the encoder and then either into rtmp out, recording out
  * or into an AVStream that can be used by other muxers
  *
  * @param frame
  */
 void outputWriteAudioFrame(AVFrame* frame);
+
+/**
+ * @brief take the input video frame and push it through
+ * the encoder and then either into rtmp out, recording out
+ * or dash/hls output
+ * @param frame
+ */
 void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame);
 
+/**
+ * @brief start the output processing
+ *
+ * @param data
+ * @return int
+ */
 int startOutput(OutputCtxT* data);
+
+/**
+ * @brief clean up all resources allocated for the output
+ *
+ * @param data
+ */
+void outputClose(OutputCtxT* data);
 
 #endif

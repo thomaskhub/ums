@@ -67,5 +67,10 @@ int videoFilterPush(VideoFilter *ctx, AVFrame *frame);
  */
 int videoFilterPull(VideoFilter *ctx, AVFrame **frame);
 
+/**
+ * @brief Release all resources allocated for the video filter
+ *
+ * @param ctx
+ */
 void videoFilterFree(VideoFilter *ctx);
 #endif

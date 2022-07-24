@@ -114,15 +114,18 @@ freeInput:
 }
 
 void videoFilterFree(VideoFilter *ctx) {
-  avfilter_graph_free(&ctx->fGraph);
-  avfilter_inout_free(&ctx->out);
-  avfilter_inout_free(&ctx->in);
+  if (ctx->fGraph) {
+    avfilter_graph_free(&ctx->fGraph);
+    avfilter_inout_free(&ctx->out);
+    avfilter_inout_free(&ctx->in);
+  }
 }
 
 int videoFilterPush(VideoFilter *ctx, AVFrame *frame) {
   int ret;
 
-  ret = av_buffersrc_add_frame(ctx->srcCtx, frame);
+  ret = av_buffersrc_add_frame_flags(ctx->srcCtx, frame,
+                                     AV_BUFFERSRC_FLAG_KEEP_REF);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "videoFilterPush::not able to push frame\n");
     return ret;
@@ -134,10 +137,5 @@ int videoFilterPush(VideoFilter *ctx, AVFrame *frame) {
 int videoFilterPull(VideoFilter *ctx, AVFrame **frame) {
   int ret;
   ret = av_buffersink_get_frame(ctx->sinkCtx, *frame);
-  // if (ret < 0 ) {
-  //   av_log(NULL, AV_LOG_ERROR, "videoFilterPull::not able to pull frame\n");
-  //   return ret;
-  // }
-
   return ret;
 }
