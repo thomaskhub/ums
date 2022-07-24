@@ -24,16 +24,6 @@ static int openDash(DashCtxT* data, AVCodecContext** encoderCtx) {
     }
   }
 
-  //   if (!data->dashOutCtx->flags & AVFMT_NOFILE) {
-  //     ret =
-  //         avio_open(&data->dashOutCtx->pb, data->dashIndexPath,
-  //         AVIO_FLAG_WRITE);
-
-  //     if (ret < 0) {
-  //       goto closeOutput;
-  //     }
-  //   }
-
   for (i = 0; i < data->streamLen; i++) {
     ret = avcodec_parameters_from_context(data->dashStreams[i]->codecpar,
                                           encoderCtx[i]);
@@ -95,4 +85,9 @@ void dashWritePacket(DashCtxT* data, AVPacket* packet) {
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "dashWritePacket::could not write to mux\n");
   }
+}
+
+void dashClose(DashCtxT* data) {
+  free(data->dashStreams);
+  closeOutput(&data->dashOutCtx);
 }

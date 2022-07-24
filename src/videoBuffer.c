@@ -144,3 +144,10 @@ int videoBufferPull(VideoBuffer *buf, uint32_t *off, uint32_t *len,
   }
   return AVERROR(AVERROR_UNKNOWN);
 }
+
+void videoBufferClose(VideoBuffer *buf) {
+  int i;
+  for (i = 0; i < 2 * buf->frameCount; i++) {
+    av_frame_free(&buf->doubleBuffer[i]);
+  }
+}

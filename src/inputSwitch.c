@@ -5,6 +5,7 @@ static PushVideo vPush;
 static RtmpIsActive checkRtmp;
 static Filler filler;
 static uint32_t videoPTS = 0;
+static uint8_t runThread = 1;
 
 void *_worker(void *args) {
   int rtmpStatus, fillerInProgress = 0;
@@ -14,7 +15,7 @@ void *_worker(void *args) {
   uint32_t vBufOff, vBufLen, vBufId;
   AVFrame *vFrame;
 
-  while (1) {
+  while (runThread) {
     rtmpStatus = checkRtmp();
     if (rtmpStatus == 1) {
       ret = videoBufferPull(&rtmpInVBuffer, &vBufOff, &vBufLen, &vBufId);
@@ -174,4 +175,19 @@ freeSession:
 freePreSsession:
   av_frame_free(&filler.vPreFiller);
   return ret;
+}
+
+void inputSwitchClose() {
+  if (filler.vPreFiller) {
+    av_frame_unref(filler.vPreFiller);
+  }
+  if (filler.vSessionFiller) {
+    av_frame_unref(filler.vSessionFiller);
+  }
+  if (filler.vPostFiller) {
+    av_frame_unref(filler.vPostFiller);
+  }
+
+  runThread = 0;
+  pthread_join(inputSwitchThread, NULL);
 }

@@ -2,11 +2,15 @@
 
 static pthread_t threadOpenRtmp;
 static uint8_t rtmpOutRunning = 0;
+static uint8_t runThread = 1;
+
+void outputStopRtmp() { runThread = 0; }
+void outputRtmpJoin() { pthread_join(threadOpenRtmp, NULL); }
 
 static void* openRtmp(void* user) {
-  while (1) {
+  OutputCtxT* data = (OutputCtxT*)user;
+  while (runThread) {
     int ret;
-    OutputCtxT* data = (OutputCtxT*)user;
     data->rtmpOutCtx = NULL;
 
     // if output is not available retry until it becomes available
@@ -41,6 +45,10 @@ static void* openRtmp(void* user) {
   end:
     data->rtmpOutCtx = NULL;
     rtmpOutRunning = 0;
+  }
+
+  if (data->rtmpOutCtx) {
+    closeOutput(&data->rtmpOutCtx);
   }
 }
 
@@ -86,6 +94,9 @@ int startOutput(OutputCtxT* data) {
   data->timebase.den = VIDEO_TIMEBASE_DEN;
   data->sampleAspectRatio.den = 1;
   data->sampleAspectRatio.num = 1;
+
+  data->videoEncCtx = NULL;
+  data->recCtx = NULL;
 
   ret = initEncoder(&data->videoEncCtx, &data->videoEncoder, AV_CODEC_ID_H264);
   if (ret < 0) {
@@ -192,6 +203,14 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
       return;
     }
 
+    // ret = getEmptyVideoFrame(&data->encoderFrame, data->format,
+    // data->outWidth,
+    //                          data->outHeight);
+    // if (ret < 0) {
+    //   av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not create empty
+    //   video\n"); return;
+    // }
+
     ret = videoFilterPull(&data->vFilter, &data->encoderFrame);
     if (ret < 0) {
       if (ret == AVERROR(EAGAIN)) {
@@ -207,6 +226,10 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
       av_log(NULL, AV_LOG_ERROR, "output::Could not copy frame to encoder\n");
       exit(1);
     }
+
+    av_frame_unref(data->encoderFrame);  // TODO: not sure if that is good
+    // av_frame_free(&data->encoderFrame);  // TODO: not sure if that is good
+
   } else {
     ret = avcodec_send_frame(data->videoEncCtx, frame);
     if (ret < 0) {
@@ -258,14 +281,36 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
 
       dashWritePacket(data->dashCtx, dashPacket);
       av_packet_unref(dashPacket);
+      av_packet_free(&dashPacket);
     }
+
+    av_packet_unref(data->packet);
     if (ret < 0) {
       break;
     }
   }
-  av_packet_unref(data->packet);
 }
 
+void outputClose(OutputCtxT* data) {
+  if (data->path && data->recCtx) {
+    closeOutput(&data->recCtx);
+  };
+
+  outputStopRtmp();
+  outputRtmpJoin();
+
+  if (data->filterEna) {
+    videoFilterFree(&data->vFilter);
+  }
+
+  if (data->packet->buf) {
+    av_packet_unref(data->packet);
+  }
+
+  if (data->videoEncCtx) {
+    closeCodec(&data->videoEncCtx);
+  }
+}
 // void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame) {
 //   av_packet_rescale_ts(data->outRtmpPacket, data->timebase,
 //                        data->outVideoRtmp->time_base);  //

@@ -76,4 +76,6 @@ int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
  * @return int 0 on success, AVERROR code otherwise
  */
 int prepareVideoFiller(char *path, AVFrame **frame);
+
+void inputSwitchClose();
 #endif

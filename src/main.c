@@ -18,6 +18,8 @@
 */
 #include <libavutil/log.h>
 #include <libgen.h>
+#include <mcheck.h>
+#include <signal.h>
 
 #include "config.h"
 #include "dash.h"
@@ -33,7 +35,6 @@
 #define RTMP_OUT_URL "rtmp://localhost/live/output"
 #define DASH_MANIFEST_PATH "/tmp/dash/index.mpd"
 #define RECORD_PATH "/tmp/testing.ts"
-#define RECORD_PATH2 "/tmp/testing2.ts"
 #define preFiller "/home/thomas/Pictures/a.jpg"
 #define sessionFiller "/home/thomas/Pictures/a.jpg"
 #define postFiller "/home/thomas/Pictures/a.jpg"
@@ -73,44 +74,50 @@ OutputCtxT vOutCfg[] = {
      .type = AVMEDIA_TYPE_VIDEO},
 
 };
-// {
-//     .name = "low",
-//     .bitrate = 150000,
-//     .path = RECORD_PATH2,
-//     .gop = 100,
-//     .inWidth = VIDEO_WIDTH,
-//     .inHeight = VIDEO_HEIGHT,
-//     .outWidth = 256,
-//     .outHeight = 144,
-//     .format = VIDEO_PIX_FMT,
-//     .timebase = {.num = VIDEO_TIMEBASE_NUM, .den = VIDEO_TIMEBASE_DEN},
-//     .sampleAspectRatio = {.num = 1, .den = 1},
-// }};
 
 // TODO: implement the audio processing
 void switchPushAFrame(AVFrame* frame) {}
 
-// Called when frame should be written to the output, push the frame to all
-// outputs modules which in turn will change bitrate, and resosluiont and
-// then output dash / hls. Stream 0 will also output rtmp or mpegts recording
-// if enabled.
 void switchPushVFrame(AVFrame* frame) {
   int i, cfgLength, ret;
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
-  // if (frame->width == 0) return;
   for (i = 0; i < cfgLength; i++) {
-    AVFrame* tmpFrame = av_frame_clone(frame);
-    outputWriteVideoFrame(&vOutCfg[i], tmpFrame);
-    av_frame_unref(tmpFrame);
+    outputWriteVideoFrame(&vOutCfg[i], frame);
   }
 }
 
+static DashCtxT dashCtx;
+static int cfgLength;
+static AVCodecContext** dashCodecList;
+
+/**
+ * This is not 100% needed but to find memory leak with mtrace better to close
+ * everything at the
+ */
+void signalCloseHandler(int signum) {
+  int i;
+  printf("Signal recieved %i\n", signum);
+  inputSwitchClose();
+  dashClose(&dashCtx);
+
+  for (i = 0; i < cfgLength; i++) {
+    outputClose(&vOutCfg[i]);
+  }
+
+  rtmpInputStop();
+  rtmpInputJoin();  // wait for rtmp input thread to be terminated
+  free(dashCodecList);
+  exit(signum);
+}
+
 int main() {
-  int ret, i, cfgLength;
-  AVCodecContext** dashCodecList;
-  DashCtxT dashCtx;
+  int ret, i;
+
   char* dashDirName;
-  // av_log_set_level(AV_LOG_DEBUG);
+
+  // av_log_set_level(AV_LOG_QUIET);
+  signal(SIGINT, signalCloseHandler);
+  // mtrace();
 
   dashDirName = dirname(strdup(DASH_MANIFEST_PATH));
   ret = mkdirP(dashDirName);
@@ -140,7 +147,6 @@ int main() {
     av_log(NULL, AV_LOG_DEBUG, "Going to setup output = %s\n", vOutCfg[i].name);
     vOutCfg[i].streamIdx = i;
     vOutCfg[i].dashCtx = &dashCtx;
-
     ret = startOutput(&vOutCfg[i]);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR,
@@ -172,6 +178,5 @@ int main() {
   ret = inputSwitchInit(switchPushVFrame, switchPushAFrame, rtmpIsRunning,
                         preFiller, sessionFiller, postFiller, streamStart,
                         sessionStart, sessionEnd);
-
   rtmpInputJoin();
 }

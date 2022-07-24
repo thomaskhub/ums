@@ -26,5 +26,6 @@ typedef struct DashCtxT {
 
 int startDash(DashCtxT* data, AVCodecContext** encoderCtx);
 void dashWritePacket(DashCtxT* data, AVPacket* packet);
+void dashClose(DashCtxT* data);
 
 #endif
