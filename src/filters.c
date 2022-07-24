@@ -137,10 +137,5 @@ int videoFilterPush(VideoFilter *ctx, AVFrame *frame) {
 int videoFilterPull(VideoFilter *ctx, AVFrame **frame) {
   int ret;
   ret = av_buffersink_get_frame(ctx->sinkCtx, *frame);
-  // if (ret < 0 ) {
-  //   av_log(NULL, AV_LOG_ERROR, "videoFilterPull::not able to pull frame\n");
-  //   return ret;
-  // }
-
   return ret;
 }

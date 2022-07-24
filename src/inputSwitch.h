@@ -77,5 +77,8 @@ int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
  */
 int prepareVideoFiller(char *path, AVFrame **frame);
 
+/**
+ * @brief Release inputSwitch resources
+ */
 void inputSwitchClose();
 #endif

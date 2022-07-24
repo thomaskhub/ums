@@ -72,14 +72,6 @@ int openOutput(AVFormatContext **outFmtCtx, char *filename,
     }
   }
 
-  //  if (audioStream) {
-  // (*audioStream) = avformat_new_stream((*outFmtCtx), NULL);
-  // if (!(*audioStream)) {
-  //   closeOutput(outFmtCtx);
-  //   return AVERROR(ENOMEM);
-  // }
-  // }
-
   if (!((*outFmtCtx)->flags & AVFMT_NOFILE)) {
     ret = avio_open(&(*outFmtCtx)->pb, filename, AVIO_FLAG_WRITE);
     if (ret < 0) {
@@ -93,7 +85,6 @@ int openOutput(AVFormatContext **outFmtCtx, char *filename,
 
 void closeCodec(AVCodecContext **codec) { avcodec_free_context(codec); }
 
-// Open a decoder based on the incoming streams
 int openDecoder(AVCodecContext **decCtx, AVCodec **decoder, AVStream *stream) {
   int ret;
   (*decoder) = avcodec_find_decoder(stream->codecpar->codec_id);

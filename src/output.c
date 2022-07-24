@@ -203,14 +203,6 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
       return;
     }
 
-    // ret = getEmptyVideoFrame(&data->encoderFrame, data->format,
-    // data->outWidth,
-    //                          data->outHeight);
-    // if (ret < 0) {
-    //   av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not create empty
-    //   video\n"); return;
-    // }
-
     ret = videoFilterPull(&data->vFilter, &data->encoderFrame);
     if (ret < 0) {
       if (ret == AVERROR(EAGAIN)) {
@@ -311,9 +303,11 @@ void outputClose(OutputCtxT* data) {
     closeCodec(&data->videoEncCtx);
   }
 }
-// void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame) {
-//   av_packet_rescale_ts(data->outRtmpPacket, data->timebase,
-//                        data->outVideoRtmp->time_base);  //
+
+// TODO:
+//  void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame) {
+//    av_packet_rescale_ts(data->outRtmpPacket, data->timebase,
+//                         data->outVideoRtmp->time_base);  //
 
 //   ret = av_interleaved_write_frame(data->rtmpOutCtx, data->outRtmpPacket);
 // }
