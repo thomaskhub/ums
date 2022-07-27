@@ -44,7 +44,9 @@ int64_t getPTScaled(AVRational timebase);
 int getFrameFromImage(AVFormatContext **ctx, char *path,
                       AVFrame **pictureFrame);
 
-int getEmptyVideoFrame(AVFrame **frame, int pixFmt, int width, int height);
+int getEmptyAvFrame(AVFrame **frame, int pixFmt, int width, int height,
+                    enum AVSampleFormat smpFmt, int nbSamples,
+                    uint64_t channelLayout, enum AVMediaType type);
 
 /**
  * @brief take a YUV420P video frame and store it into a jpeg

@@ -23,12 +23,12 @@
 #include <libavutil/time.h>
 #include <pthread.h>
 
+#include "avBuffer.h"
 #include "config.h"
 #include "filters.h"
 #include "mux.h"
 #include "rtmpInput.h"
 #include "utils.h"
-#include "videoBuffer.h"
 
 typedef void (*PushVideo)(AVFrame *frame);
 typedef void (*PushAudio)(AVFrame *frame);

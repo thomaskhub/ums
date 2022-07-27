@@ -86,6 +86,11 @@ end:
 int startOutput(OutputCtxT* data) {
   int ret;
 
+  if (data->type == AVMEDIA_TYPE_AUDIO) {
+    // TODO: for now skip audio  but needs to be implemented next
+    return -1;
+  }
+
   data->gop = 100;
   data->inWidth = VIDEO_WIDTH;
   data->inHeight = VIDEO_HEIGHT;
@@ -154,16 +159,16 @@ int startOutput(OutputCtxT* data) {
     snprintf(data->filterDesc, 128, "scale=%d:%d", data->outWidth,
              data->outHeight);
 
-    ret = initVideoFilter(&data->vFilter, data->filterDesc, data->inWidth,
-                          data->inHeight, data->format, data->timebase,
-                          data->sampleAspectRatio);
+    ret = initAvFilter(&data->vFilter, data->filterDesc, data->inWidth,
+                       data->inHeight, data->format, data->timebase,
+                       data->sampleAspectRatio, 0, 0, 0, AVMEDIA_TYPE_VIDEO);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR, "output::could not init video filter\n");
       goto closeRecordingOut;
     }
 
-    ret = getEmptyVideoFrame(&data->encoderFrame, data->format, data->outWidth,
-                             data->outHeight);
+    ret = getEmptyAvFrame(&data->encoderFrame, data->format, data->outWidth,
+                          data->outHeight, 0, 0, 0, AVMEDIA_TYPE_VIDEO);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not create empty video\n");
       goto closeRecordingOut;
@@ -197,13 +202,13 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
   AVPacket *recPacket, *rtmpPacket, *dashPacket;
 
   if (data->filterEna) {
-    ret = videoFilterPush(&data->vFilter, frame);
+    ret = avFilterPush(&data->vFilter, frame);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR, "output::could not push into filter\n");
       return;
     }
 
-    ret = videoFilterPull(&data->vFilter, &data->encoderFrame);
+    ret = avFilterPull(&data->vFilter, &data->encoderFrame);
     if (ret < 0) {
       if (ret == AVERROR(EAGAIN)) {
         return;
@@ -305,15 +310,15 @@ void outputClose(OutputCtxT* data) {
 }
 
 // TODO:
-//  void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame) {
-//    av_packet_rescale_ts(data->outRtmpPacket, data->timebase,
-//                         data->outVideoRtmp->time_base);  //
+void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame) {
+  //    av_packet_rescale_ts(data->outRtmpPacket, data->timebase,
+  //                         data->outVideoRtmp->time_base);  //
 
-//   ret = av_interleaved_write_frame(data->rtmpOutCtx, data->outRtmpPacket);
-// }
-// if (ret < 0) {
-//   break;
-// }
-// }
-// av_packet_unref(data->outRtmpPacket);
-// }
+  //   ret = av_interleaved_write_frame(data->rtmpOutCtx, data->outRtmpPacket);
+  // }
+  // if (ret < 0) {
+  //   break;
+  // }
+  // }
+  // av_packet_unref(data->outRtmpPacket);
+}

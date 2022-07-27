@@ -39,6 +39,7 @@ typedef struct {
   int outHeight;
   int format;
   enum AVMediaType type;
+  int channels;
 
   /**
    * @brief Dash output stream index
@@ -50,7 +51,7 @@ typedef struct {
   AVRational sampleAspectRatio;
   AVFormatContext* recCtx;
   AVStream *outVideoRec, *outAudioRec;
-  VideoFilter vFilter;
+  AvFilter vFilter;
   char filterDesc[128];
   AVStream *outVideoRtmp, *outAudioRtmp;
   AVCodecContext* videoEncCtx;
@@ -67,7 +68,7 @@ typedef struct {
  *
  * @param frame
  */
-void outputWriteAudioFrame(AVFrame* frame);
+void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame);
 
 /**
  * @brief take the input video frame and push it through

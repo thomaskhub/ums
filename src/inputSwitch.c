@@ -5,6 +5,7 @@ static PushVideo vPush;
 static RtmpIsActive checkRtmp;
 static Filler filler;
 static uint32_t videoPTS = 0;
+static uint32_t audioPTS = 0;
 static uint8_t runThread = 1;
 
 void *_worker(void *args) {
@@ -12,32 +13,51 @@ void *_worker(void *args) {
   int64_t start, sleepTime, end, correction;
   int i = 0, ret;
   time_t now;
-  uint32_t vBufOff, vBufLen, vBufId;
-  AVFrame *vFrame;
+  uint32_t vBufOff, vBufLen;
+  uint32_t aBufOff, aBufLen;
+  AVFrame *vFrame, *aFrame;
 
   while (runThread) {
     rtmpStatus = checkRtmp();
+
     if (rtmpStatus == 1) {
-      ret = videoBufferPull(&rtmpInVBuffer, &vBufOff, &vBufLen, &vBufId);
+      ret = avBufferPull2(&rtmpInVBuffer, &vBufOff, &vBufLen);
       if (ret < 0 && ret != AVERROR(EAGAIN)) {
         av_log(NULL, AV_LOG_FATAL,
                "inputSwitch::rtmp video buffer unknown error\n");
         exit(1);
-      }
-
-      if (ret >= 0) {
+      } else if (ret >= 0) {
         for (i = 0; i < vBufLen; i++) {
-          vFrame = (&rtmpInVBuffer.doubleBuffer[vBufOff])[i];
+          vFrame = (&rtmpInVBuffer.buffer[vBufOff])[i];
           vFrame->pts = videoPTS;
           vFrame->pkt_dts = videoPTS;
           vPush(vFrame);
           videoPTS += VIDEO_PTS_OFF;
         }
-        videoBufferDone(&rtmpInVBuffer, vBufId);
+        avBufferDone2(&rtmpInVBuffer);
+      }
+
+      // audio
+      ret = avBufferPull2(&rtmpInABuffer, &aBufOff, &aBufLen);
+      if (ret < 0 && ret != AVERROR(EAGAIN)) {
+        av_log(NULL, AV_LOG_FATAL,
+               "inputSwitch::rtmp audio buffer unknown error\n");
+        exit(1);
+      }
+
+      if (ret >= 0) {
+        aFrame = rtmpInABuffer.buffer[aBufOff];
+        aFrame->pts = audioPTS;
+        aFrame->pkt_dts = audioPTS;
+        aPush(aFrame);
+        audioPTS += AUDIO_PTS_OFF;
+
+        avBufferDone2(&rtmpInABuffer);
       }
 
     } else {
-      printf("Debug:: %li\n", av_gettime_relative() - start);
+      printf("Debug:: %li   rtmpSTat = %u\n", av_gettime_relative() - start,
+             rtmpStatus);
       start = av_gettime_relative();
 
       // Push one second of video data
@@ -78,7 +98,7 @@ void *_worker(void *args) {
 int prepareVideoFiller(char *path, AVFrame **frame) {
   AVFrame *imgFrame;
   AVFormatContext *inCtx;
-  VideoFilter vFilter;
+  AvFilter vFilter;
   AVRational timebase = {.den = 1000, .num = 1};
   AVRational aspectRatio = {.den = 1, .num = 1};
 
@@ -91,27 +111,29 @@ int prepareVideoFiller(char *path, AVFrame **frame) {
     return ret;
   }
 
-  ret = initVideoFilter(&vFilter, FILLER_VIDEO_FILTER, imgFrame->width,
-                        imgFrame->height, VIDEO_PIX_FMT, timebase, aspectRatio);
+  ret = initAvFilter(&vFilter, FILLER_VIDEO_FILTER, imgFrame->width,
+                     imgFrame->height, VIDEO_PIX_FMT, timebase, aspectRatio, 0,
+                     0, 0, AVMEDIA_TYPE_VIDEO);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not init video filter\n");
     goto freeFrame;
   }
 
-  ret = getEmptyVideoFrame(frame, VIDEO_PIX_FMT, VIDEO_WIDTH, VIDEO_HEIGHT);
+  ret = getEmptyAvFrame(frame, VIDEO_PIX_FMT, VIDEO_WIDTH, VIDEO_HEIGHT, 0, 0,
+                        0, AVMEDIA_TYPE_VIDEO);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not create empty video\n");
     goto freeFilter;
   }
 
   // Convert the image into the correct internal representation
-  ret = videoFilterPush(&vFilter, imgFrame);
+  ret = avFilterPush(&vFilter, imgFrame);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not push into filter\n");
     goto freeFilter;
   }
 
-  ret = videoFilterPull(&vFilter, frame);
+  ret = avFilterPull(&vFilter, frame);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not push into filter\n");
     goto freeFilter;

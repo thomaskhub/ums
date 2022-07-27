@@ -23,11 +23,11 @@
 #include <libavutil/samplefmt.h>
 #include <pthread.h>
 
+#include "avBuffer.h"
 #include "config.h"
 #include "filters.h"
 #include "mux.h"
 #include "utils.h"
-#include "videoBuffer.h"
 
 typedef struct {
   int audioSampleRate;
@@ -38,7 +38,8 @@ typedef struct {
 } RtmpInputInfo;
 
 // Video buffer to assemble 1s chunks
-VideoBuffer rtmpInVBuffer;
+AvBuffer rtmpInVBuffer;
+AvBuffer rtmpInABuffer;
 
 typedef struct {
   char *url;
@@ -46,10 +47,7 @@ typedef struct {
   void (*videoCallback)(AVFrame *frame, AVRational framerate);
 } RtmpWorkerData;
 
-void rtmpInputStart(char *url,
-                    void (*audioCallback)(AVFrame *frame, AVRational framerate),
-                    void (*videoCallback)(AVFrame *frame,
-                                          AVRational framerate));
+void rtmpInputStart(char *url);
 
 void rtmpInputStop();
 void rtmpInputJoin();

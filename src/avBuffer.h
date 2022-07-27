@@ -21,14 +21,19 @@
 
 #include <libavutil/frame.h>
 
-typedef struct VideoBuffer {
-  AVFrame **doubleBuffer;  // Array of AVFrame pointers
+typedef struct AvBuffer {
+  AVFrame **buffer;        // Array of AVFrame pointers
   uint8_t selectedBuffer;  // 0 first buffer, 1 second buffer
   uint32_t frameCount;
-  uint32_t bufOffset[2];
-} VideoBuffer;
+  uint8_t wrPtr;
+  uint8_t rdPtr;
+  uint32_t off;
+  uint32_t bufOffset[4];
+  enum AVMediaType type;
+  int nbSamples;
+} AvBuffer;
 
-typedef void (*PushHandler)(VideoBuffer *buf, AVFrame **buffer,
+typedef void (*PushHandler)(AvBuffer *buf, AVFrame **buffer,
                             uint32_t frameCount, uint8_t bufId);
 
 /**
@@ -39,19 +44,33 @@ typedef void (*PushHandler)(VideoBuffer *buf, AVFrame **buffer,
  * initVideoBuffer function we will create an array of pointers
  * to AVFrames with allocated memory. We copy the input data into
  * the buffers so that input can release frame memory if needed.
+ *
+ * Audio and Video buffer will work a little differently internally.
+ * For audio the we are allocation 44 frames each of which will hold
+ * 1024 in total we could save 45,056 samples. As we a running at a sample rate
+ * of 44100k we will have 43 frames with 1024 samples and the last frame will
+ * only have 68 samples. This is needed to store exactly one second in the
+ * buffer. But the last incoming audio frame will also have 1024, so 1024-68
+ * frames need to be stored at the beginning of the next buffer
  */
-int videoBufferInit(VideoBuffer *buf, uint32_t frameCount,
-                    enum AVPixelFormat pixFmt, int width, int height);
+int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
+                 int width, int height, enum AVSampleFormat smpFmt,
+                 int nbSamples, uint64_t channelLayout, enum AVMediaType type);
 
+int avBufferPull2(AvBuffer *buf, uint32_t *off, uint32_t *len);
+int avBufferPush2(AvBuffer *buf, AVFrame *frame);
+int avBufferDone2(AvBuffer *buf);
+uint8_t avBufferFull(AvBuffer *buf);
 /**
  * After the buffer is initialized we need a function with which we can
- * copy input data into the double buffer. For this push frame will be called.
+ * copy input data into the double buffer. For this push frame will be
+ * called.
  *
  * pushFrame will need to tell the caller when double buffer is ready for
  * processing for this is will call a callback handler passing the array of
- * pointers The callback can then take the array and push it into the encoders.
- * The memory passed to the callback handler is not released or changed until
- * the callback handler has acknowledged processing.
+ * pointers The callback can then take the array and push it into the
+ * encoders. The memory passed to the callback handler is not released or
+ * changed until the callback handler has acknowledged processing.
  *
  * If no buffer is available (overrun) we drop the next 1 seconds of data.
  * This should actually never happens and will be done only for debugging.
@@ -60,23 +79,24 @@ int videoBufferInit(VideoBuffer *buf, uint32_t frameCount,
  * Its important that Frame has the same width, height and pixel format then
  * defined in the buffer init function.
  *
- * If we do not want that the module pushes data we can set the handler to NULL
- * If handler is null we need to actively check and pull data from the buffer
+ * If we do not want that the module pushes data we can set the handler to
+ * NULL If handler is null we need to actively check and pull data from the
+ * buffer
  */
-int videoBufferPush(VideoBuffer *buf, AVFrame *frame, PushHandler handler);
+int avBufferPush(AvBuffer *buf, AVFrame *frame, PushHandler handler);
 
 /**
  * Once the callback handler has processed all video data passed to it it needs
  * to call the bufferDone function passing the buffer id which has been
  * processed Buffer id can be 0 or 1 and is passed to the callback handler
  */
-void videoBufferDone(VideoBuffer *buf, uint8_t bufId);
+void avBufferDone(AvBuffer *buf, uint8_t bufId);
 
 /**
  * We also need to have the possibility to reset the buffer
  * e.g. if rtmp input goes down to not mix old and new data
  */
-void videoBufferReset(VideoBuffer *buf);
+void avBufferReset(AvBuffer *buf);
 
 /**
  * In certain situations we would like to pull data from the output
@@ -89,9 +109,8 @@ void videoBufferReset(VideoBuffer *buf);
  * If no buffer is ready it will return EAGAIN.
  *
  */
-int videoBufferPull(VideoBuffer *buf, uint32_t *off, uint32_t *len,
-                    uint32_t *bufId);
+int avBufferPull(AvBuffer *buf, uint32_t *off, uint32_t *len, uint32_t *bufId);
 
-void videoBufferClose(VideoBuffer *buf);
+void avBufferClose(AvBuffer *buf);
 
 #endif

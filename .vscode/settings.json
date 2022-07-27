@@ -9,7 +9,8 @@
     "dash.h": "c",
     "utils.h": "c",
     "rational.h": "c",
-    "paths.h": "c"
+    "paths.h": "c",
+    "*.tcc": "c"
   },
   "makefile.launchConfigurations": [
     {
@@ -17,5 +18,6 @@
       "binaryPath": "/home/thomas/Documents/isha-media/ums/ums",
       "binaryArgs": []
     }
-  ]
+  ],
+  "C_Cpp.errorSquiggles": "Enabled"
 }

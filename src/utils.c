@@ -34,8 +34,8 @@ int getFrameFromImage(AVFormatContext **ctx, char *path,
     goto closeInput;
   }
 
-  ret = getEmptyVideoFrame(pictureFrame, decCtx->pix_fmt, decCtx->width,
-                           decCtx->height);
+  ret = getEmptyAvFrame(pictureFrame, decCtx->pix_fmt, decCtx->width,
+                        decCtx->height, 0, 0, 0, AVMEDIA_TYPE_VIDEO);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "utils::getFrameFromImage::not able to get empty video frame\n");
@@ -99,7 +99,9 @@ closeInput:
   return ret;
 }
 
-int getEmptyVideoFrame(AVFrame **frame, int pixFmt, int width, int height) {
+int getEmptyAvFrame(AVFrame **frame, int pixFmt, int width, int height,
+                    enum AVSampleFormat smpFmt, int nbSamples,
+                    uint64_t channelLayout, enum AVMediaType type) {
   int ret;
 
   *frame = av_frame_alloc();
@@ -109,9 +111,15 @@ int getEmptyVideoFrame(AVFrame **frame, int pixFmt, int width, int height) {
     return AVERROR(ENOMEM);
   }
 
-  (*frame)->format = pixFmt;
-  (*frame)->width = width;
-  (*frame)->height = height;
+  if (type == AVMEDIA_TYPE_VIDEO) {
+    (*frame)->format = pixFmt;
+    (*frame)->width = width;
+    (*frame)->height = height;
+  } else if (type == AVMEDIA_TYPE_AUDIO) {
+    (*frame)->format = smpFmt;
+    (*frame)->nb_samples = nbSamples;
+    (*frame)->channel_layout = channelLayout;
+  }
 
   ret = av_frame_get_buffer(*frame, 0);
   if (ret < 0) {

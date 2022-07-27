@@ -72,11 +72,19 @@ OutputCtxT vOutCfg[] = {
      .outWidth = 256,
      .outHeight = 144,
      .type = AVMEDIA_TYPE_VIDEO},
-
 };
 
-// TODO: implement the audio processing
-void switchPushAFrame(AVFrame* frame) {}
+OutputCtxT aOutCfg[] = {
+    {.bitrate = 64000, .channels = 1, .type = AVMEDIA_TYPE_AUDIO},
+};
+
+void switchPushAFrame(AVFrame* frame) {
+  int i, cfgLength, ret;
+  cfgLength = sizeof(aOutCfg) / sizeof(aOutCfg[0]);
+  for (i = 0; i < cfgLength; i++) {
+    // outputWriteVideoFrame(&aOutCfg[i], frame);
+  }
+}
 
 void switchPushVFrame(AVFrame* frame) {
   int i, cfgLength, ret;
@@ -141,7 +149,9 @@ int main() {
     exit(1);
   }
 
-  rtmpInputStart(RTMP_IN_URL, NULL, NULL);
+  rtmpInputStart(RTMP_IN_URL);
+  // rtmpInputJoin();  // TODO: remove this, only to test and implement audio in
+  // the input
 
   for (i = 0; i < cfgLength; i++) {
     av_log(NULL, AV_LOG_DEBUG, "Going to setup output = %s\n", vOutCfg[i].name);
@@ -149,9 +159,10 @@ int main() {
     vOutCfg[i].dashCtx = &dashCtx;
     ret = startOutput(&vOutCfg[i]);
     if (ret < 0) {
-      av_log(NULL, AV_LOG_ERROR,
-             "main::could not start output. abort. code = %i\n", ret);
-      exit(1);
+      av_log(NULL, AV_LOG_WARNING,
+             "main::could not start output. stream index = %i\n", i);
+      // exit(1)
+      continue;
     }
 
     if (vOutCfg[i].type == AVMEDIA_TYPE_VIDEO) {
