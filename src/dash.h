@@ -31,6 +31,7 @@ typedef struct DashCtxT {
    * 7 is audio stream
    */
   AVStream** dashStreams;
+  AVStream* dashASteam;  // TODO: hook this up to the audio decoder
   uint8_t streamLen;
   AVFormatContext* dashOutCtx;
   AVRational timebase;

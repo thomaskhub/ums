@@ -21,14 +21,16 @@
 
 #include <libavutil/frame.h>
 
+#include "config.h"
+
 typedef struct AvBuffer {
-  AVFrame **buffer;        // Array of AVFrame pointers
-  uint8_t selectedBuffer;  // 0 first buffer, 1 second buffer
+  AVFrame **buffer;  // Array of AVFrame pointers
+  // uint8_t selectedBuffer;  // 0 first buffer, 1 second buffer
   uint32_t frameCount;
   uint8_t wrPtr;
   uint8_t rdPtr;
-  uint32_t off;
-  uint32_t bufOffset[4];
+  // uint32_t off;
+  // uint32_t bufOffset[4];
   enum AVMediaType type;
   int nbSamples;
 } AvBuffer;
@@ -57,60 +59,7 @@ int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
                  int width, int height, enum AVSampleFormat smpFmt,
                  int nbSamples, uint64_t channelLayout, enum AVMediaType type);
 
-int avBufferPull2(AvBuffer *buf, uint32_t *off, uint32_t *len);
+int avBufferPull2(AvBuffer *buf, AVFrame **frame);
 int avBufferPush2(AvBuffer *buf, AVFrame *frame);
-int avBufferDone2(AvBuffer *buf);
-uint8_t avBufferFull(AvBuffer *buf);
-/**
- * After the buffer is initialized we need a function with which we can
- * copy input data into the double buffer. For this push frame will be
- * called.
- *
- * pushFrame will need to tell the caller when double buffer is ready for
- * processing for this is will call a callback handler passing the array of
- * pointers The callback can then take the array and push it into the
- * encoders. The memory passed to the callback handler is not released or
- * changed until the callback handler has acknowledged processing.
- *
- * If no buffer is available (overrun) we drop the next 1 seconds of data.
- * This should actually never happens and will be done only for debugging.
- * If this happens we would need to check the design.
- *
- * Its important that Frame has the same width, height and pixel format then
- * defined in the buffer init function.
- *
- * If we do not want that the module pushes data we can set the handler to
- * NULL If handler is null we need to actively check and pull data from the
- * buffer
- */
-int avBufferPush(AvBuffer *buf, AVFrame *frame, PushHandler handler);
-
-/**
- * Once the callback handler has processed all video data passed to it it needs
- * to call the bufferDone function passing the buffer id which has been
- * processed Buffer id can be 0 or 1 and is passed to the callback handler
- */
-void avBufferDone(AvBuffer *buf, uint8_t bufId);
-
-/**
- * We also need to have the possibility to reset the buffer
- * e.g. if rtmp input goes down to not mix old and new data
- */
-void avBufferReset(AvBuffer *buf);
-
-/**
- * In certain situations we would like to pull data from the output
- * instead if it being pushed to some other input.
- *
- * videoBufferPull will return the buffer start pointer and the number of
- * elements that can be processed.
- *
- * After processing is done videoBufferDone must be called as well.
- * If no buffer is ready it will return EAGAIN.
- *
- */
-int avBufferPull(AvBuffer *buf, uint32_t *off, uint32_t *len, uint32_t *bufId);
-
-void avBufferClose(AvBuffer *buf);
 
 #endif

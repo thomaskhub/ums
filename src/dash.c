@@ -5,6 +5,9 @@ static int openDash(DashCtxT* data, AVCodecContext** encoderCtx) {
   AVDictionary* opts = NULL;
   data->dashOutCtx = NULL;
 
+  // TODO: add audio stream to the data and make sure we add it to the
+  // dash output
+
   ret = avformat_alloc_output_context2(&data->dashOutCtx, NULL, "dash",
                                        data->dashIndexPath);
   if (ret < 0) {
@@ -47,7 +50,7 @@ static int openDash(DashCtxT* data, AVCodecContext** encoderCtx) {
 
   ret = avformat_write_header(data->dashOutCtx, &opts);
   if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "openRtmp::could not write rtmp out header\n");
+    av_log(NULL, AV_LOG_ERROR, "openDash::write dash header failed\n");
     goto closeOutput;
   }
 

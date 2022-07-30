@@ -4,41 +4,49 @@ static PushAudio aPush;
 static PushVideo vPush;
 static RtmpIsActive checkRtmp;
 static Filler filler;
-static uint32_t videoPTS = 0;
-static uint32_t audioPTS = 0;
+static int64_t videoPTS = 0;
+static int64_t audioPTS = 0;
 static uint8_t runThread = 1;
 
 void *_worker(void *args) {
-  int rtmpStatus, fillerInProgress = 0;
-  int64_t start, sleepTime, end, correction;
+  int rtmpStatus, lastRtmpStatus, fillerInProgress = 0;
+  int64_t start, sleepTime, end, correction, aDuration, aFirstPts, aLastPTS;
   int i = 0, ret;
   time_t now;
   uint32_t vBufOff, vBufLen;
   uint32_t aBufOff, aBufLen;
   AVFrame *vFrame, *aFrame;
+  uint8_t firstAudioSample = 1;
 
   while (runThread) {
     rtmpStatus = checkRtmp();
 
     if (rtmpStatus == 1) {
-      ret = avBufferPull2(&rtmpInVBuffer, &vBufOff, &vBufLen);
+      // align the start times after stream switch
+      // if (lastRtmpStatus == 0) {
+      //   videoPTS = audioPTS < videoPTS ? audioPTS : videoPTS;
+      //   audioPTS = videoPTS;
+      // }
+
+      ret = avBufferPull2(&rtmpInVBuffer, &vFrame);
       if (ret < 0 && ret != AVERROR(EAGAIN)) {
         av_log(NULL, AV_LOG_FATAL,
                "inputSwitch::rtmp video buffer unknown error\n");
         exit(1);
       } else if (ret >= 0) {
-        for (i = 0; i < vBufLen; i++) {
-          vFrame = (&rtmpInVBuffer.buffer[vBufOff])[i];
-          vFrame->pts = videoPTS;
-          vFrame->pkt_dts = videoPTS;
-          vPush(vFrame);
-          videoPTS += VIDEO_PTS_OFF;
-        }
-        avBufferDone2(&rtmpInVBuffer);
+        // for (i = 0; i < vBufLen; i++) {
+        // vFrame = (&rtmpInVBuffer.buffer[vBufOff])[i];
+        vFrame->pts = videoPTS;
+        vFrame->pkt_dts = videoPTS;
+        vPush(vFrame);
+        videoPTS += VIDEO_PTS_OFF;
+        printf("Debug:video::%lu\n", videoPTS);
+        // }
+        // avBufferDone2(&rtmpInVBuffer);
       }
 
       // audio
-      ret = avBufferPull2(&rtmpInABuffer, &aBufOff, &aBufLen);
+      ret = avBufferPull2(&rtmpInABuffer, &aFrame);
       if (ret < 0 && ret != AVERROR(EAGAIN)) {
         av_log(NULL, AV_LOG_FATAL,
                "inputSwitch::rtmp audio buffer unknown error\n");
@@ -46,19 +54,35 @@ void *_worker(void *args) {
       }
 
       if (ret >= 0) {
-        aFrame = rtmpInABuffer.buffer[aBufOff];
-        aFrame->pts = audioPTS;
-        aFrame->pkt_dts = audioPTS;
-        aPush(aFrame);
-        audioPTS += AUDIO_PTS_OFF;
+        if (firstAudioSample == 1) {
+          aLastPTS = aFrame->pkt_pts;
+          firstAudioSample = 0;
 
-        avBufferDone2(&rtmpInABuffer);
+          aFrame->pts = audioPTS;
+          aFrame->pkt_dts = audioPTS;
+          aPush(aFrame);
+          audioPTS += aFrame->pkt_duration;
+        } else {
+          aDuration = aFrame->pkt_pts - aLastPTS;
+          aLastPTS = aFrame->pkt_pts;
+          aFrame->pts = audioPTS;
+          aFrame->pkt_dts = audioPTS;
+          aPush(aFrame);
+          audioPTS += aDuration;
+        }
       }
-
-    } else {
+    }
+#if 0
+    else {
+      firstAudioSample = 1;
       printf("Debug:: %li   rtmpSTat = %u\n", av_gettime_relative() - start,
              rtmpStatus);
       start = av_gettime_relative();
+
+      // if (lastRtmpStatus == 1) {
+      //   videoPTS = audioPTS < videoPTS ? audioPTS : videoPTS;
+      //   audioPTS = videoPTS;
+      // }
 
       // Push one second of video data
       for (i = 0; i < VIDEO_FRAME_RATE; i++) {
@@ -92,6 +116,8 @@ void *_worker(void *args) {
         av_usleep(sleepTime);
       }
     }
+#endif
+    lastRtmpStatus = rtmpStatus;
   }
 }
 

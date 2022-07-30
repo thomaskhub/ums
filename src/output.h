@@ -21,6 +21,7 @@
 
 #include <pthread.h>
 
+#include "audioEncoder.h"
 #include "config.h"
 #include "dash.h"
 #include "filters.h"
@@ -55,10 +56,13 @@ typedef struct {
   char filterDesc[128];
   AVStream *outVideoRtmp, *outAudioRtmp;
   AVCodecContext* videoEncCtx;
+  // AVCodecContext* audioEncCtx;
   AVCodec* videoEncoder;
+  // AVCodec* audioEncoder;
   AVPacket* packet;
   AVFrame* encoderFrame;
   DashCtxT* dashCtx;
+  AudioEncCtx* audioEnc;
 } OutputCtxT;
 
 /**
@@ -69,7 +73,7 @@ typedef struct {
  * @param frame
  */
 void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame);
-
+int outputWriteAudioPacket(OutputCtxT* output);
 /**
  * @brief take the input video frame and push it through
  * the encoder and then either into rtmp out, recording out
@@ -84,7 +88,7 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame);
  * @param data
  * @return int
  */
-int startOutput(OutputCtxT* data);
+int startOutput(OutputCtxT* ctx);
 
 /**
  * @brief clean up all resources allocated for the output

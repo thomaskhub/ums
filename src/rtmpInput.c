@@ -11,8 +11,6 @@ static AvFilter aFilter;
 static int firstVideoFrame = 1;
 static int firstAudioFrame = 1;
 volatile static int rtmpRunning = 0;
-static uint8_t aRetry = 0;
-static uint8_t vRetry = 0;
 
 void rtmpInputStop() { runThread = 0; }
 void rtmpInputJoin() { pthread_join(inputThread, NULL); }
@@ -56,8 +54,8 @@ void *worker(void *data) {
   while (runThread && ret >= 0) {
     printf("rtmp in the loop\n");
     rtmpRunning = 0;
-    avBufferReset(&rtmpInVBuffer);
-    avBufferReset(&rtmpInABuffer);
+    // avBufferReset(&rtmpInVBuffer);
+    // avBufferReset(&rtmpInABuffer);
     ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo);
     if (ret < 0) {
       av_log(NULL, AV_LOG_DEBUG,
@@ -144,6 +142,19 @@ void *worker(void *data) {
           }
 
           if (ret == AVERROR(EAGAIN)) {
+            break;
+          }
+
+          if (audioFrame->pts < inputVideo->start_time) {
+            break;  // read the nect packet and drop this frame until we
+                    // reache the start
+          }
+
+          // printf("Debug::Audio:: %li  %li %li %li %li\n", audioFrame->pts,
+          //        inputAudio->time_base.num, inputAudio->time_base.den,
+          //        av_frame_get_pkt_pos(audioFrame), inputVideo->start_time);
+
+          if (ret == AVERROR(EAGAIN)) {
             continue;
           }
 
@@ -182,9 +193,7 @@ void *worker(void *data) {
           ret = avBufferPush2(&rtmpInABuffer, audioOutFrame);
           if (ret < 0) {
             av_log(NULL, AV_LOG_DEBUG, "rtmpInput::buffer full retry...\n");
-            aRetry = 1;
             continue;
-            // goto freeAll;
           }
         }
 
@@ -206,9 +215,21 @@ void *worker(void *data) {
             goto freeAll;
           }
 
+          if (ret == AVERROR(EAGAIN)) {
+            break;
+          }
+
           // Take the frame, filter it, then push it into double buffer for
           // creating one second chunks for further processing
           if (ret >= 0) {
+            if (videoFrame->pts < inputVideo->start_time) {
+              break;  // read the nect packet and drop this frame until we
+                      // reache the start
+            }
+            // printf("Debug::Video:: %lu  %lu %lu %lu %lu\n", videoFrame->pts,
+            //        videoFrame->pkt_duration, videoFrame->pkt_pts,
+            //        av_frame_get_pkt_pos(videoFrame), inputVideo->start_time);
+
             if (firstVideoFrame == 1) {
               firstVideoFrame = 0;
               ret = initAvFilter(
@@ -246,9 +267,7 @@ void *worker(void *data) {
             if (ret < 0) {
               av_log(NULL, AV_LOG_DEBUG,
                      "rtmpInput::video buffer full retry...\n");
-              vRetry = 1;
               continue;
-              // goto freeAll;
             }
           }
         }
@@ -299,7 +318,7 @@ void *worker(void *data) {
   closeCodec(&audioDecCtx);
   closeCodec(&videoDecCtx);
   closeInput(&inFmtCtx);
-  avBufferClose(&rtmpInVBuffer);
+  // avBufferClose(&rtmpInVBuffer); //TODO: enable this again
   printf("Input loop stoppped...\n");
 }
 
@@ -308,11 +327,18 @@ void rtmpInputStart(char *url) {
 
   wData.url = url;
 
-  avBufferInit(&rtmpInVBuffer, VIDEO_FRAME_RATE, VIDEO_PIX_FMT, VIDEO_WIDTH,
-               VIDEO_HEIGHT, 0, 0, 0, AVMEDIA_TYPE_VIDEO);
+  rtmpInABuffer.buffer = 0;
+  rtmpInABuffer.type = AVMEDIA_TYPE_AUDIO;
 
-  avBufferInit(&rtmpInABuffer, 0, 0, 0, 0, AUDIO_SAMPLE_FMT, AUDIO_RATE,
-               AUDIO_CH_LAYOUT, AVMEDIA_TYPE_AUDIO);
+  rtmpInVBuffer.buffer = 0;
+  rtmpInVBuffer.type = AVMEDIA_TYPE_VIDEO;
+
+  // avBufferInit(&rtmpInVBuffer, 3, VIDEO_PIX_FMT, VIDEO_WIDTH, VIDEO_HEIGHT,
+  // 0,
+  //              0, 0, AVMEDIA_TYPE_VIDEO);
+
+  // avBufferInit(&rtmpInABuffer, 3, 0, 0, 0, AUDIO_SAMPLE_FMT, AUDIO_RATE,
+  //              AUDIO_CH_LAYOUT, AVMEDIA_TYPE_AUDIO);
 
   pthread_create(&inputThread, NULL, worker, NULL);
 }

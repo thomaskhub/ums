@@ -35,6 +35,7 @@
 
 // 44 frames with 1024 samples each ->
 #define AUDIO_BUF_FRAME_CNT 45
+#define AAC_FRAME_SIZE 1024
 
 #define FILLER_VIDEO_FILTER "scale=1280:720,format=yuv420p"
 

@@ -21,6 +21,7 @@
 #include <mcheck.h>
 #include <signal.h>
 
+#include "audioEncoder.h"
 #include "config.h"
 #include "dash.h"
 #include "inputSwitch.h"
@@ -74,23 +75,32 @@ OutputCtxT vOutCfg[] = {
      .type = AVMEDIA_TYPE_VIDEO},
 };
 
-OutputCtxT aOutCfg[] = {
-    {.bitrate = 64000, .channels = 1, .type = AVMEDIA_TYPE_AUDIO},
-};
+AudioEncCtx aOutCfg = {.bitrate = 64000};
 
 void switchPushAFrame(AVFrame* frame) {
-  int i, cfgLength, ret;
-  cfgLength = sizeof(aOutCfg) / sizeof(aOutCfg[0]);
+  int i, cfgLength, ret, pts;
+  aOutCfg.frame = frame;
+  pts = frame->pkt_pts;
+
+  ret = audioEncoderRun(&aOutCfg);
+  if (ret < 0) {
+    return;
+  }
+
+  cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
   for (i = 0; i < cfgLength; i++) {
-    // outputWriteVideoFrame(&aOutCfg[i], frame);
+    outputWriteAudioPacket(&vOutCfg[i]);
   }
 }
 
 void switchPushVFrame(AVFrame* frame) {
   int i, cfgLength, ret;
+
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
   for (i = 0; i < cfgLength; i++) {
+    // AVFrame* clone = av_frame_clone(frame);
     outputWriteVideoFrame(&vOutCfg[i], frame);
+    // av_frame_free(&clone);
   }
 }
 
@@ -153,10 +163,17 @@ int main() {
   // rtmpInputJoin();  // TODO: remove this, only to test and implement audio in
   // the input
 
+  ret = audioEncoderInit(&aOutCfg);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "main::audio encoder init failed\n");
+    exit(1);
+  }
+
   for (i = 0; i < cfgLength; i++) {
     av_log(NULL, AV_LOG_DEBUG, "Going to setup output = %s\n", vOutCfg[i].name);
     vOutCfg[i].streamIdx = i;
     vOutCfg[i].dashCtx = &dashCtx;
+    vOutCfg[i].audioEnc = &aOutCfg;
     ret = startOutput(&vOutCfg[i]);
     if (ret < 0) {
       av_log(NULL, AV_LOG_WARNING,
