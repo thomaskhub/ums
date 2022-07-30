@@ -179,6 +179,8 @@ void *worker(void *data) {
             goto freeAll;
           }
 
+          av_frame_unref(audioFrame);
+
           ret = avFilterPull(&aFilter, &audioOutFrame);
           if (ret < 0) {
             if (ret == AVERROR(EAGAIN)) {
@@ -195,6 +197,7 @@ void *worker(void *data) {
             av_log(NULL, AV_LOG_DEBUG, "rtmpInput::buffer full retry...\n");
             continue;
           }
+          av_frame_unref(audioOutFrame);
         }
 
       } else if (rtmpPacket.stream_index == inputVideo->index) {
@@ -216,6 +219,7 @@ void *worker(void *data) {
           }
 
           if (ret == AVERROR(EAGAIN)) {
+            av_frame_unref(videoFrame);
             break;
           }
 
@@ -223,12 +227,10 @@ void *worker(void *data) {
           // creating one second chunks for further processing
           if (ret >= 0) {
             if (videoFrame->pts < inputVideo->start_time) {
+              av_frame_unref(videoFrame);
               break;  // read the nect packet and drop this frame until we
                       // reache the start
             }
-            // printf("Debug::Video:: %lu  %lu %lu %lu %lu\n", videoFrame->pts,
-            //        videoFrame->pkt_duration, videoFrame->pkt_pts,
-            //        av_frame_get_pkt_pos(videoFrame), inputVideo->start_time);
 
             if (firstVideoFrame == 1) {
               firstVideoFrame = 0;
@@ -250,6 +252,8 @@ void *worker(void *data) {
               goto freeAll;
             }
 
+            av_frame_unref(videoFrame);
+
             ret = avFilterPull(&vFilter, &videoOutFrame);
             if (ret < 0) {
               if (ret == AVERROR(EAGAIN)) {
@@ -269,6 +273,7 @@ void *worker(void *data) {
                      "rtmpInput::video buffer full retry...\n");
               continue;
             }
+            av_frame_unref(videoOutFrame);
           }
         }
       }
@@ -332,14 +337,6 @@ void rtmpInputStart(char *url) {
 
   rtmpInVBuffer.buffer = 0;
   rtmpInVBuffer.type = AVMEDIA_TYPE_VIDEO;
-
-  // avBufferInit(&rtmpInVBuffer, 3, VIDEO_PIX_FMT, VIDEO_WIDTH, VIDEO_HEIGHT,
-  // 0,
-  //              0, 0, AVMEDIA_TYPE_VIDEO);
-
-  // avBufferInit(&rtmpInABuffer, 3, 0, 0, 0, AUDIO_SAMPLE_FMT, AUDIO_RATE,
-  //              AUDIO_CH_LAYOUT, AVMEDIA_TYPE_AUDIO);
-
   pthread_create(&inputThread, NULL, worker, NULL);
 }
 

@@ -34,15 +34,10 @@ void *_worker(void *args) {
                "inputSwitch::rtmp video buffer unknown error\n");
         exit(1);
       } else if (ret >= 0) {
-        // for (i = 0; i < vBufLen; i++) {
-        // vFrame = (&rtmpInVBuffer.buffer[vBufOff])[i];
         vFrame->pts = videoPTS;
         vFrame->pkt_dts = videoPTS;
         vPush(vFrame);
         videoPTS += VIDEO_PTS_OFF;
-        printf("Debug:video::%lu\n", videoPTS);
-        // }
-        // avBufferDone2(&rtmpInVBuffer);
       }
 
       // audio

@@ -225,7 +225,7 @@ int outputWriteAudioPacket(OutputCtxT* output) {
   // av_packet_unref(pkt);
 
   if (output->path && output->recCtx) {
-    // handle MPEGTS recording if enabled
+    // // handle MPEGTS recording if enabled
     recPacket = av_packet_clone(output->audioEnc->packet);
 
     av_packet_rescale_ts(recPacket, output->timebase,
@@ -235,6 +235,11 @@ int outputWriteAudioPacket(OutputCtxT* output) {
     ret = av_interleaved_write_frame(output->recCtx, recPacket);
     av_packet_unref(recPacket);
   }
+
+  // av_packet_unref(output->audioEnc->packet);  // make sure to release the
+  // packe,
+  //                                             // without this causes memory
+  //                                             leak
 }
 
 void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
@@ -265,7 +270,6 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
     }
 
     av_frame_unref(data->encoderFrame);  // TODO: not sure if that is good
-    // av_frame_free(&data->encoderFrame);  // TODO: not sure if that is good
 
   } else {
     ret = avcodec_send_frame(data->videoEncCtx, frame);
@@ -277,6 +281,15 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
 
   while (ret >= 0) {
     ret = avcodec_receive_packet(data->videoEncCtx, data->packet);
+    if (ret == AVERROR(EAGAIN)) {
+      break;
+    }
+
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_DEBUG, "outputWriteVideoFrame::enc packet failed\n");
+      exit(1);
+    }
+
     if (ret == 0) {
       if (data->url && data->rtmpOutCtx && rtmpOutRunning) {
         // handle rtmp output if enabled
@@ -320,11 +333,7 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
       av_packet_unref(dashPacket);
       av_packet_free(&dashPacket);
     }
-
     av_packet_unref(data->packet);
-    if (ret < 0) {
-      break;
-    }
   }
 }
 
@@ -347,18 +356,4 @@ void outputClose(OutputCtxT* data) {
   if (data->videoEncCtx) {
     closeCodec(&data->videoEncCtx);
   }
-}
-
-// TODO:
-void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame) {
-  //    av_packet_rescale_ts(data->outRtmpPacket, data->timebase,
-  //                         data->outVideoRtmp->time_base);  //
-
-  //   ret = av_interleaved_write_frame(data->rtmpOutCtx, data->outRtmpPacket);
-  // }
-  // if (ret < 0) {
-  //   break;
-  // }
-  // }
-  // av_packet_unref(data->outRtmpPacket);
 }

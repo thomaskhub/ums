@@ -91,6 +91,7 @@ void switchPushAFrame(AVFrame* frame) {
   for (i = 0; i < cfgLength; i++) {
     outputWriteAudioPacket(&vOutCfg[i]);
   }
+  av_packet_unref(aOutCfg.packet);
 }
 
 void switchPushVFrame(AVFrame* frame) {
@@ -98,10 +99,8 @@ void switchPushVFrame(AVFrame* frame) {
 
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
   for (i = 0; i < cfgLength; i++) {
-    // AVFrame* clone = av_frame_clone(frame);
     outputWriteVideoFrame(&vOutCfg[i], frame);
-    // av_frame_free(&clone);
-  }
+    }
 }
 
 static DashCtxT dashCtx;
