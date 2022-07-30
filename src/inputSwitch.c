@@ -10,7 +10,10 @@ static uint8_t runThread = 1;
 
 void *_worker(void *args) {
   int rtmpStatus, lastRtmpStatus, fillerInProgress = 0;
-  int64_t start, sleepTime, end, correction, aDuration, aFirstPts, aLastPTS;
+
+  int64_t start, sleepTime, end, correction, aDuration, aFirstPts, aLastPTS,
+      highResAudioPTS = 0;
+
   int i = 0, ret;
   time_t now;
   uint32_t vBufOff, vBufLen;
@@ -23,10 +26,10 @@ void *_worker(void *args) {
 
     if (rtmpStatus == 1) {
       // align the start times after stream switch
-      // if (lastRtmpStatus == 0) {
-      //   videoPTS = audioPTS < videoPTS ? audioPTS : videoPTS;
-      //   audioPTS = videoPTS;
-      // }
+      if (lastRtmpStatus == 0) {
+        videoPTS = audioPTS > videoPTS ? audioPTS : videoPTS;
+        audioPTS = videoPTS;
+      }
 
       ret = avBufferPull2(&rtmpInVBuffer, &vFrame);
       if (ret < 0 && ret != AVERROR(EAGAIN)) {
@@ -67,17 +70,16 @@ void *_worker(void *args) {
         }
       }
     }
-#if 0
+
     else {
       firstAudioSample = 1;
-      printf("Debug:: %li   rtmpSTat = %u\n", av_gettime_relative() - start,
-             rtmpStatus);
       start = av_gettime_relative();
 
-      // if (lastRtmpStatus == 1) {
-      //   videoPTS = audioPTS < videoPTS ? audioPTS : videoPTS;
-      //   audioPTS = videoPTS;
-      // }
+      if (lastRtmpStatus == 1) {
+        videoPTS = audioPTS > videoPTS ? audioPTS : videoPTS;
+        audioPTS = videoPTS;
+        highResAudioPTS = audioPTS * 1000;
+      }
 
       // Push one second of video data
       for (i = 0; i < VIDEO_FRAME_RATE; i++) {
@@ -87,20 +89,25 @@ void *_worker(void *args) {
           filler.vPreFiller->pkt_dts = videoPTS;
           vPush(filler.vPreFiller);
           videoPTS += VIDEO_PTS_OFF;
-          // TODO: aPush(filler.aPreFiller);
+
         } else if (now >= filler.sessionStart && now < filler.sessionEnd) {
           vPush(filler.vSessionFiller);
           filler.vSessionFiller->pts = videoPTS;
           filler.vSessionFiller->pkt_dts = videoPTS;
           videoPTS += VIDEO_PTS_OFF;
-          // TODO: aPush(filler.aSessionFiller);
         } else {
           filler.vPostFiller->pts = videoPTS;
           filler.vPostFiller->pkt_dts = videoPTS;
           vPush(filler.vPostFiller);
           videoPTS += VIDEO_PTS_OFF;
-          // TODO:  aPush(filler.aPostFiller);
         }
+
+        // push empty audio
+        filler.audioFiller->pts = audioPTS;
+        filler.audioFiller->pkt_dts = audioPTS;
+        aPush(filler.audioFiller);
+        highResAudioPTS += AUDIO_PTS_OFF;
+        audioPTS = highResAudioPTS / 1000;
       }
 
       end = av_gettime_relative();
@@ -111,7 +118,7 @@ void *_worker(void *args) {
         av_usleep(sleepTime);
       }
     }
-#endif
+
     lastRtmpStatus = rtmpStatus;
   }
 }
@@ -169,6 +176,21 @@ freeFrame:
   return ret;
 }
 
+int prepareAudioFiller(AVFrame **frame) {
+  int ret, i;
+  ret = getEmptyAvFrame(frame, 0, 0, 0, AUDIO_SAMPLE_FMT, AUDIO_NB_SAMPLES,
+                        AUDIO_CH_LAYOUT, AVMEDIA_TYPE_AUDIO);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR,
+           "prepareAudioFiller::could not get empty frame\n");
+    exit(1);
+  }
+
+  for (i = 0; i < (*frame)->nb_samples; i++) {
+    (*frame)->data[0][i] = 0;
+  }
+}
+
 int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
                     char *preFiller, char *sessionFiller, char *postFiller,
                     char *streamStart, char *sessionStart, char *sessionEnd) {
@@ -202,8 +224,16 @@ int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
     goto freeSession;
   }
 
-  // TODO: implment error handling is time strings are not propper format.
-  // for now we assume the one calling this function will ensure this.
+  ret = prepareAudioFiller(&filler.audioFiller);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR,
+           "inputSwitch::could not prepare post-session filler\n");
+    goto freePost;
+  }
+
+  // TODO: implment error handling is time strings are not propper
+  // format. for now we assume the one calling this function will
+  // ensure this.
   filler.sessionStart = isoTimeToEpoch(sessionStart);
   filler.sessionEnd = isoTimeToEpoch(sessionEnd);
   filler.streamStart = isoTimeToEpoch(streamStart);
@@ -212,6 +242,8 @@ int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
 
   return 0;
 
+freePost:
+  av_frame_free(&filler.vPostFiller);
 freeSession:
   av_frame_free(&filler.vSessionFiller);
 freePreSsession:

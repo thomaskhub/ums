@@ -31,7 +31,7 @@
 #define AUDIO_NB_SAMPLES 1024
 #define AUDIO_RATE 44100
 #define AUDIO_CH_LAYOUT AV_CH_LAYOUT_MONO
-#define AUDIO_PTS_OFF (uint32_t)(VIDEO_TIMEBASE_DEN / AUDIO_RATE)
+#define AUDIO_PTS_OFF (uint32_t)(1000000000 / AUDIO_RATE)
 
 // 44 frames with 1024 samples each ->
 #define AUDIO_BUF_FRAME_CNT 45

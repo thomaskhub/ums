@@ -38,9 +38,7 @@ typedef struct Filler {
   AVFrame *vPreFiller;
   AVFrame *vSessionFiller;
   AVFrame *vPostFiller;
-  AVFrame *aPreFiller;
-  AVFrame *aSessionFiller;
-  AVFrame *aPostFiller;
+  AVFrame *audioFiller;
   time_t streamStart;
   time_t sessionStart;
   time_t sessionEnd;

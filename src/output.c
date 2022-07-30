@@ -215,7 +215,7 @@ closeCodec:
 }
 
 int outputWriteAudioPacket(OutputCtxT* output) {
-  AVPacket *pkt, *recPacket;
+  AVPacket *pkt, *recPacket, *rtmpPacket, *dashPacket;
   int ret;
 
   // pkt = av_packet_clone(ctx->packet);
@@ -223,6 +223,18 @@ int outputWriteAudioPacket(OutputCtxT* output) {
 
   // ret = av_interleaved_write_frame(output->recCtx, pkt);
   // av_packet_unref(pkt);
+
+  if (output->url && output->rtmpOutCtx && rtmpOutRunning) {
+    // handle rtmp output if enabled
+    rtmpPacket = av_packet_clone(output->audioEnc->packet);
+
+    av_packet_rescale_ts(rtmpPacket, output->timebase,
+                         output->outVideoRtmp->time_base);
+
+    rtmpPacket->stream_index = 1;
+    ret = av_interleaved_write_frame(output->rtmpOutCtx, rtmpPacket);
+    av_packet_unref(rtmpPacket);
+  }
 
   if (output->path && output->recCtx) {
     // // handle MPEGTS recording if enabled
@@ -236,10 +248,15 @@ int outputWriteAudioPacket(OutputCtxT* output) {
     av_packet_unref(recPacket);
   }
 
-  // av_packet_unref(output->audioEnc->packet);  // make sure to release the
-  // packe,
-  //                                             // without this causes memory
-  //                                             leak
+  // dashPacket = av_packet_clone(data->packet);
+  // dashPacket->stream_index = data->streamIdx;
+
+  // av_packet_rescale_ts(dashPacket, data->timebase,
+  //                      data->dashCtx->dashStreams[data->streamIdx]->time_base);
+
+  // dashWritePacket(data->dashCtx, dashPacket);
+  // av_packet_unref(dashPacket);
+  // av_packet_free(&dashPacket);
 }
 
 void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
