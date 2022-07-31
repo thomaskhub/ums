@@ -248,15 +248,23 @@ int outputWriteAudioPacket(OutputCtxT* output) {
     av_packet_unref(recPacket);
   }
 
-  // dashPacket = av_packet_clone(data->packet);
-  // dashPacket->stream_index = data->streamIdx;
+  // Only the main output will push audio to dash
+  if (output->name == "main") {
+    dashPacket = av_packet_clone(output->audioEnc->packet);
+    dashPacket->stream_index = output->dashCtx->streamLen + 1;
 
-  // av_packet_rescale_ts(dashPacket, data->timebase,
-  //                      data->dashCtx->dashStreams[data->streamIdx]->time_base);
+    printf("Debug:: origPacket --> %lu %lu\n", output->audioEnc->packet->pts,
+           output->audioEnc->packet->dts);
 
-  // dashWritePacket(data->dashCtx, dashPacket);
-  // av_packet_unref(dashPacket);
-  // av_packet_free(&dashPacket);
+    av_packet_rescale_ts(dashPacket, output->timebase,
+                         output->dashCtx->dashASteam->time_base);
+
+    printf("Debug::%lu %lu\n", dashPacket->pts, dashPacket->dts);
+
+    dashWritePacket(output->dashCtx, dashPacket);
+    av_packet_unref(dashPacket);
+    av_packet_free(&dashPacket);
+  }
 }
 
 void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {

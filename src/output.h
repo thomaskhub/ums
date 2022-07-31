@@ -46,6 +46,7 @@ typedef struct {
    * @brief Dash output stream index
    */
   int streamIdx;
+  uint8_t handleDashAudio;
   uint8_t filterEna;
   AVRational timebase;
   AVFormatContext* rtmpOutCtx;

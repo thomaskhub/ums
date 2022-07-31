@@ -31,7 +31,7 @@ typedef struct DashCtxT {
    * 7 is audio stream
    */
   AVStream** dashStreams;
-  AVStream* dashASteam;  // TODO: hook this up to the audio decoder
+  AVStream* dashASteam;
   uint8_t streamLen;
   AVFormatContext* dashOutCtx;
   AVRational timebase;
@@ -50,7 +50,8 @@ typedef struct DashCtxT {
  * @param encoderCtx
  * @return int
  */
-int startDash(DashCtxT* data, AVCodecContext** encoderCtx);
+int startDash(DashCtxT* data, AVCodecContext** encoderCtx,
+              AVCodecContext* aCodecCtx);
 
 /**
  * @brief write a packet to the dash mux

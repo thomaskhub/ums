@@ -100,7 +100,7 @@ void switchPushVFrame(AVFrame* frame) {
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
   for (i = 0; i < cfgLength; i++) {
     outputWriteVideoFrame(&vOutCfg[i], frame);
-    }
+  }
 }
 
 static DashCtxT dashCtx;
@@ -190,7 +190,7 @@ int main() {
 
   dashCtx.dashIndexPath = DASH_MANIFEST_PATH;
   dashCtx.streamLen = cfgLength;
-  ret = startDash(&dashCtx, dashCodecList);
+  ret = startDash(&dashCtx, dashCodecList, aOutCfg.encCtx);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "main::could not start dash output...");
   }
