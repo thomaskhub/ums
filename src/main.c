@@ -78,14 +78,15 @@ OutputCtxT vOutCfg[] = {
 AudioEncCtx aOutCfg = {.bitrate = 64000};
 
 void switchPushAFrame(AVFrame* frame) {
-  int i, cfgLength, ret, pts;
+  int i, cfgLength, ret;
   aOutCfg.frame = frame;
-  pts = frame->pkt_pts;
 
   ret = audioEncoderRun(&aOutCfg);
   if (ret < 0) {
     return;
   }
+
+  aOutCfg.packet->duration = frame->pkt_duration,
 
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
   for (i = 0; i < cfgLength; i++) {
@@ -127,7 +128,7 @@ void signalCloseHandler(int signum) {
   exit(signum);
 }
 
-int main() {
+int main(int argc, char* argv) {
   int ret, i;
 
   char* dashDirName;
@@ -143,11 +144,7 @@ int main() {
     exit(1);
   }
 
-  ret = cleanDir(dashDirName);
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "main::could not clean dash dir\n");
-    exit(1);
-  }
+  cleanDashDir(dashDirName);
 
   av_log(NULL, AV_LOG_DEBUG, "main::going to start the media server\n");
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);

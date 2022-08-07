@@ -139,9 +139,12 @@ int startOutput(OutputCtxT* ctx) {
   ctx->videoEncCtx->colorspace = AVCOL_SPC_BT709;
   ctx->videoEncCtx->color_trc = AVCOL_TRC_BT709;
   ctx->videoEncCtx->color_primaries = AVCOL_PRI_BT709;
+  ctx->videoEncCtx->flags = AV_CODEC_FLAG_GLOBAL_HEADER;
 
+  av_opt_set(ctx->videoEncCtx->priv_data, "level", "3.1", 0);
   av_opt_set(ctx->videoEncCtx->priv_data, "preset", "veryfast", 0);
   av_opt_set(ctx->videoEncCtx->priv_data, "tune", "stillimage", 0);
+  av_opt_set(ctx->videoEncCtx->priv_data, "profile", "high", 0);
 
   ret = avcodec_open2(ctx->videoEncCtx, ctx->videoEncoder, NULL);
   if (ret < 0) {
@@ -249,17 +252,12 @@ int outputWriteAudioPacket(OutputCtxT* output) {
   }
 
   // Only the main output will push audio to dash
-  if (output->name == "main") {
+  if (output->name && strcmp(output->name, "main") == 0) {
     dashPacket = av_packet_clone(output->audioEnc->packet);
-    dashPacket->stream_index = output->dashCtx->streamLen + 1;
-
-    printf("Debug:: origPacket --> %lu %lu\n", output->audioEnc->packet->pts,
-           output->audioEnc->packet->dts);
+    dashPacket->stream_index = output->dashCtx->streamLen;
 
     av_packet_rescale_ts(dashPacket, output->timebase,
                          output->dashCtx->dashASteam->time_base);
-
-    printf("Debug::%lu %lu\n", dashPacket->pts, dashPacket->dts);
 
     dashWritePacket(output->dashCtx, dashPacket);
     av_packet_unref(dashPacket);

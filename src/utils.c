@@ -119,6 +119,7 @@ int getEmptyAvFrame(AVFrame **frame, int pixFmt, int width, int height,
     (*frame)->format = smpFmt;
     (*frame)->nb_samples = nbSamples;
     (*frame)->channel_layout = channelLayout;
+    (*frame)->sample_rate = AUDIO_RATE;
   }
 
   ret = av_frame_get_buffer(*frame, 0);
@@ -300,14 +301,30 @@ int getNowAsIso(char **isoTimeString) {
   return ret;
 }
 
-int cleanDir(const char *path) {
+void cleanDashDir(const char *path) {
+  int ret;
   char cmd[1024];
+  cmd[0] = 0;
+
+  // delete the mpd files
+  strcat(cmd, "exec rm -r ");
+  strcat(cmd, path);
+  strcat(cmd, "/*.mpd > /dev/null");
+  ret = system(cmd);
+
+  // delete the media chunks
   cmd[0] = 0;
   strcat(cmd, "exec rm -r ");
   strcat(cmd, path);
-  strcat(cmd, "/* > /dev/null");
-  printf("%s\n", cmd);
-  return system(cmd);
+  strcat(cmd, "/*.m4s > /dev/null");
+  system(cmd);
+
+  // delete the hls manifest files
+  cmd[0] = 0;
+  strcat(cmd, "exec rm -r ");
+  strcat(cmd, path);
+  strcat(cmd, "/*.m3u8 > /dev/null");
+  system(cmd);
 }
 
 int mkdirP(const char *path) {

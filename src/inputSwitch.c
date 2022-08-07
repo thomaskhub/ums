@@ -53,7 +53,7 @@ void *_worker(void *args) {
 
       if (ret >= 0) {
         if (firstAudioSample == 1) {
-          aLastPTS = aFrame->pkt_pts;
+          aLastPTS = aFrame->pkt_dts;
           firstAudioSample = 0;
 
           aFrame->pts = audioPTS;
@@ -61,12 +61,13 @@ void *_worker(void *args) {
           aPush(aFrame);
           audioPTS += aFrame->pkt_duration;
         } else {
-          aDuration = aFrame->pkt_pts - aLastPTS;
-          aLastPTS = aFrame->pkt_pts;
+          aDuration = aFrame->pkt_dts - aLastPTS;
+          aLastPTS = aFrame->pkt_dts;
           aFrame->pts = audioPTS;
           aFrame->pkt_dts = audioPTS;
           aPush(aFrame);
           audioPTS += aDuration;
+          aFrame->pkt_duration = aDuration;
         }
       }
     }

@@ -98,7 +98,6 @@ int avBufferPush2(AvBuffer *buf, AVFrame *frame) {
   }
 
   buf->buffer[buf->wrPtr]->pkt_dts = frame->pkt_dts;
-  buf->buffer[buf->wrPtr]->pkt_pts = frame->pkt_pts;
   buf->buffer[buf->wrPtr]->pkt_duration = frame->pkt_duration;
   buf->buffer[buf->wrPtr]->pts = frame->pts;
 

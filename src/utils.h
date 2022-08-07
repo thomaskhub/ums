@@ -26,6 +26,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "config.h"
 #include "mux.h"
 
 void initPTS();
@@ -60,6 +61,6 @@ int writeFrameToJpeg(AVFrame *frame, char *path);
 
 time_t isoTimeToEpoch(char *isoTimestamp);
 int getNowAsIso(char **isoTimeString);
-int cleanDir(const char *path);
+void cleanDashDir(const char *path);
 int mkdirP(const char *path);
 #endif

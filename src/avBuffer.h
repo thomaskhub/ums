@@ -61,5 +61,6 @@ int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
 
 int avBufferPull2(AvBuffer *buf, AVFrame **frame);
 int avBufferPush2(AvBuffer *buf, AVFrame *frame);
+uint8_t avBufferFull(AvBuffer *buf);
 
 #endif

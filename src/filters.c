@@ -57,7 +57,7 @@ int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
              aspectRatio.den);
   } else if (type == AVMEDIA_TYPE_AUDIO) {
     snprintf(inArgs, sizeof(inArgs),
-             "sample_fmt=%lu:time_base=%d/%d:sample_rate=%d:channel_layout=%d",
+             "sample_fmt=%lu:time_base=%d/%d:sample_rate=%d:channel_layout=%lu",
              smpFmt, timebase.num, timebase.den, sampleRate, chanLayout);
   }
 

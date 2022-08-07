@@ -51,7 +51,7 @@ static int openDash(DashCtxT* data, AVCodecContext** encoderCtx,
   av_dict_set(&opts, "init_seg_name", "init$RepresentationID$.$ext$", 0);
   // av_dict_set(&opts, "media_seg_name",
   // "$RepresentationID$.$Number%05d$.$ext$", 0);
-  av_dict_set(&opts, "media_seg_name", "$RepresentationID$.$Time$.$ext$", 0);
+  av_dict_set(&opts, "media_seg_name", "$RepresentationID$.$Number$.$ext$", 0);
   av_dict_set(&opts, "use_template", "1", 0);
   av_dict_set(&opts, "use_timeline", "1", 0);
   av_dict_set(&opts, "seg_duration", "4", 0);

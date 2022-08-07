@@ -14,6 +14,7 @@ int audioEncoderInit(AudioEncCtx* ctx) {
   ctx->encCtx->sample_fmt = AUDIO_SAMPLE_FMT;
   ctx->encCtx->sample_rate = AUDIO_RATE;
   ctx->encCtx->channel_layout = AUDIO_CH_LAYOUT;
+  ctx->encCtx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
   ret = avcodec_open2(ctx->encCtx, ctx->encoder, NULL);
   if (ret < 0) {
