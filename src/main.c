@@ -16,6 +16,8 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
 * USA.
 */
+#include <dirent.h>
+#include <getopt.h>
 #include <libavutil/log.h>
 #include <libgen.h>
 #include <mcheck.h>
@@ -29,23 +31,49 @@
 #include "rtmpInput.h"
 #include "utils.h"
 
-// TODO: these defines need to be passed to the main fucntion
-//       via command line argumens and should not be statically
-//       compiled within the code
-#define RTMP_IN_URL "rtmp://localhost/live/input"
-#define RTMP_OUT_URL "rtmp://localhost/live/output"
-#define DASH_MANIFEST_PATH "/tmp/dash/index.mpd"
-#define RECORD_PATH "/tmp/testing.ts"
-#define preFiller "/home/thomas/Pictures/a.jpg"
-#define sessionFiller "/home/thomas/Pictures/a.jpg"
-#define postFiller "/home/thomas/Pictures/a.jpg"
+#define OPT_MODE 0
+#define OPT_RTMP_IN 1
+#define OPT_RTMP_OUT 2
+#define OPT_DASH 3
+#define OPT_REC 4
+#define OPT_PRE_FILLER 5
+#define OPT_SESSION_FILLER 6
+#define OPT_POST_FILLER 7
+#define OPT_STREAM_START 8
+#define OPT_SESSION_START 9
+#define OPT_SESSION_END 10
+
+static struct option longOptions[] = {
+    {"mode", required_argument, 0, OPT_MODE},
+    {"rtmpIn", required_argument, 0, OPT_RTMP_IN},
+    {"rtmpOut", required_argument, 0, OPT_RTMP_OUT},
+    {"dash", required_argument, 0, OPT_DASH},
+    {"rec", required_argument, 0, OPT_REC},
+    {"preFiller", required_argument, 0, OPT_PRE_FILLER},
+    {"sessionFiller", required_argument, 0, OPT_SESSION_FILLER},
+    {"postFiller", required_argument, 0, OPT_POST_FILLER},
+    {"streamStart", required_argument, 0, OPT_STREAM_START},
+    {"sessionStart", required_argument, 0, OPT_SESSION_START},
+    {"sessionEnd", required_argument, 0, OPT_SESSION_END},
+    {0, 0, 0, 0},
+};
+
+char *mode = NULL;
+char *rtmpInUrl = NULL;
+char *rtmpOutUrl = NULL;
+char *dashManifestPath = NULL;
+char *recordPath = NULL;
+char *preFiller = NULL;
+char *sessionFiller = NULL;
+char *postFiller = NULL;
+char *streamStart = NULL;
+char *sessionStart = NULL;
+char *sessionEnd = NULL;
 
 // Output configuration
 OutputCtxT vOutCfg[] = {
     {.name = "main",
      .bitrate = 2880000,
-     .url = RTMP_OUT_URL,
-     .path = RECORD_PATH,
      .outWidth = VIDEO_WIDTH,
      .outHeight = VIDEO_HEIGHT,
      .type = AVMEDIA_TYPE_VIDEO},
@@ -77,7 +105,25 @@ OutputCtxT vOutCfg[] = {
 
 AudioEncCtx aOutCfg = {.bitrate = 64000};
 
-void switchPushAFrame(AVFrame* frame) {
+void showHelp() {
+  printf("ums - uniterruptible media server\n");
+  printf("Usage: ums [GNU long options] ...\n");
+
+  printf("GNU long options:\n");
+  printf("\t--mode [mode]                : can be live, vod, vas (video-as-stream)\n");
+  printf("\t--rtmpIn url                 : url is rtmp consume url video\n");
+  printf("\t--rtmpOut url                : url is rtmp produce url (optional)\n");
+  printf("\t--dash path                  : directory in which to store dash/hls output data\n");
+  printf("\t--rec path                   : path to store the MPEGTS recording (optional)\n");
+  printf("\t--preF path                  : path to the pre-session filler jpg\n");
+  printf("\t--sessionF path              : path to the session filler jpg\n");
+  printf("\t--postF path                 : path to the post-session filler jpg\n");
+  printf("\t--streamStart ISO_TIMESTAMP  : stream start ISO formated string\n");
+  printf("\t--sessionStart ISO_TIMESTAMP : session start ISO formated string\n");
+  printf("\t--sessionEnd ISO_TIMESTAMP   : session end ISO formated string\n");
+}
+
+void switchPushAFrame(AVFrame *frame) {
   int i, cfgLength, ret;
   aOutCfg.frame = frame;
 
@@ -95,7 +141,7 @@ void switchPushAFrame(AVFrame* frame) {
   av_packet_unref(aOutCfg.packet);
 }
 
-void switchPushVFrame(AVFrame* frame) {
+void switchPushVFrame(AVFrame *frame) {
   int i, cfgLength, ret;
 
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
@@ -106,7 +152,7 @@ void switchPushVFrame(AVFrame* frame) {
 
 static DashCtxT dashCtx;
 static int cfgLength;
-static AVCodecContext** dashCodecList;
+static AVCodecContext **dashCodecList;
 
 /**
  * This is not 100% needed but to find memory leak with mtrace better to close
@@ -123,21 +169,184 @@ void signalCloseHandler(int signum) {
   }
 
   rtmpInputStop();
-  rtmpInputJoin();  // wait for rtmp input thread to be terminated
+  rtmpInputJoin(); // wait for rtmp input thread to be terminated
   free(dashCodecList);
   exit(signum);
 }
 
-int main(int argc, char* argv) {
-  int ret, i;
+void checkForNull(const char *val, const char *name) {
+  if (val == NULL) {
+    printf("Error: %s argument failed\n", name);
+    exit(-1);
+  }
+}
 
-  char* dashDirName;
+int startsWith(const char *a, const char *b) {
+  if (strncmp(a, b, strlen(b)) == 0) {
+    return 1;
+  }
+  return 0;
+}
+
+/**
+ * @brief input validation
+ * depending on the operating mode we will check if all parameters are set
+ * and if the defined parameters are actually correct.
+ *
+ * @return int
+ */
+int validateInput() {
+  int ret;
+  char *tmpString;
+  DIR *dir;
+
+  if (!mode) {
+    printf("Error: mode is not set\n");
+    return -1;
+  }
+
+  //
+  // validate inputs for live mode
+  //
+  if (!strcmp(mode, "live")) {
+    if (rtmpInUrl == NULL) {
+      printf("Error: rtmpIn argument is null\n");
+      return -1;
+    }
+
+    if (dashManifestPath == NULL) {
+      printf("Error: dash argument is null\n");
+      return -1;
+    }
+
+    if (preFiller == NULL || sessionFiller == NULL || postFiller == NULL) {
+      printf("Error: filler configuration incorrect\n");
+      return -1;
+    }
+
+    if (streamStart == NULL)
+      getNowAsIso(&streamStart);
+
+    if (sessionStart == NULL)
+      getNowAsIso(&sessionStart);
+
+    if (sessionEnd == NULL)
+      getNowAsIso(&sessionEnd);
+
+    if (!startsWith(rtmpInUrl, "rtmp://") && !startsWith(rtmpInUrl, "rtmps://")) {
+      printf("Error: rtmpIn is not a valid rtmp url --> %s\n", rtmpInUrl);
+      return -1;
+    }
+
+    if (rtmpOutUrl != NULL) {
+      if (!startsWith(rtmpOutUrl, "rtmp://") && !startsWith(rtmpOutUrl, "rtmps://")) {
+        printf("Error: rtmpOut is not a valid rtmp url --> %s\n", rtmpOutUrl);
+        return -1;
+      }
+    }
+
+    // check if manifest file path exists
+    tmpString = dirname(dashManifestPath);
+    dir = opendir(tmpString);
+    if (!dir) {
+      closedir(dir);
+      printf("Error: dash output directory cannot be opened");
+      return -1;
+    }
+    closedir(dir);
+
+    // check if recording path exists
+    tmpString = dirname(recordPath);
+    dir = opendir(tmpString);
+    if (!dir) {
+      closedir(dir);
+      printf("Error: recording output directory cannot be opened");
+      return -1;
+    }
+    closedir(dir);
+
+    return 0;
+  }
+
+  printf("Error: unsupported mode --> %s\n", mode);
+  return -1;
+}
+
+int main(int argc, char **argv) {
+  int ret, i, c, optionIndex;
+  char *dashDirName;
+
+  if (argc < 2) {
+    showHelp();
+    return 1;
+  }
+
+  // Parse the inout parameters
+  while (1) {
+    c = getopt_long_only(argc, argv, "", longOptions, &optionIndex);
+    if (c == -1) {
+      break;
+    }
+
+    switch (c) {
+    case OPT_RTMP_IN:
+      rtmpInUrl = optarg;
+      break;
+    case OPT_RTMP_OUT:
+      rtmpOutUrl = optarg;
+      break;
+    case OPT_MODE:
+      mode = optarg;
+      break;
+    case OPT_DASH:
+      dashManifestPath = optarg;
+      break;
+    case OPT_REC:
+      recordPath = optarg;
+      break;
+    case OPT_PRE_FILLER:
+      preFiller = optarg;
+      break;
+    case OPT_SESSION_FILLER:
+      sessionFiller = optarg;
+      break;
+    case OPT_POST_FILLER:
+      postFiller = optarg;
+      break;
+    case OPT_STREAM_START:
+      streamStart = optarg;
+      break;
+    case OPT_SESSION_START:
+      sessionStart = optarg;
+      break;
+    case OPT_SESSION_END:
+      sessionEnd = optarg;
+      break;
+
+    default:
+
+      exit(1);
+      break;
+    }
+  }
+
+  if (validateInput() < 0) {
+    return 1;
+  };
+
+  if (rtmpOutUrl) {
+    vOutCfg[0].url = rtmpOutUrl;
+  }
+
+  if (recordPath) {
+    vOutCfg[0].path = recordPath;
+  }
 
   // av_log_set_level(AV_LOG_QUIET);
   signal(SIGINT, signalCloseHandler);
   // mtrace();
 
-  dashDirName = dirname(strdup(DASH_MANIFEST_PATH));
+  dashDirName = dirname(strdup(dashManifestPath));
   ret = mkdirP(dashDirName);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "main::could not create dash dir\n");
@@ -149,13 +358,13 @@ int main(int argc, char* argv) {
   av_log(NULL, AV_LOG_DEBUG, "main::going to start the media server\n");
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
 
-  dashCodecList = malloc(cfgLength * sizeof(AVCodecContext*));
+  dashCodecList = malloc(cfgLength * sizeof(AVCodecContext *));
   if (!dashCodecList) {
     av_log(NULL, AV_LOG_ERROR, "main::could not allocated codec list. abort.");
     exit(1);
   }
 
-  rtmpInputStart(RTMP_IN_URL);
+  rtmpInputStart(rtmpInUrl);
   // rtmpInputJoin();  // TODO: remove this, only to test and implement audio in
   // the input
 
@@ -180,24 +389,17 @@ int main(int argc, char* argv) {
 
     if (vOutCfg[i].type == AVMEDIA_TYPE_VIDEO) {
       dashCodecList[i] = vOutCfg[i].videoEncCtx;
-      dashCtx.timebase = vOutCfg[i].timebase;  // take timebase from any output,
-                                               // as they are all the same
+      dashCtx.timebase = vOutCfg[i].timebase; // take timebase from any output,
+                                              // as they are all the same
     }
   }
 
-  dashCtx.dashIndexPath = DASH_MANIFEST_PATH;
+  dashCtx.dashIndexPath = dashManifestPath;
   dashCtx.streamLen = cfgLength;
   ret = startDash(&dashCtx, dashCodecList, aOutCfg.encCtx);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "main::could not start dash output...");
   }
-
-  // TODO: streamStart, sessionStart, sessionEnd also must come from cmd
-  // arguments
-  char *streamStart, *sessionStart, *sessionEnd;
-  getNowAsIso(&streamStart);
-  getNowAsIso(&sessionStart);
-  getNowAsIso(&sessionEnd);
 
   ret = inputSwitchInit(switchPushVFrame, switchPushAFrame, rtmpIsRunning,
                         preFiller, sessionFiller, postFiller, streamStart,

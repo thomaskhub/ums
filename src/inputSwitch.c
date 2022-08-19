@@ -13,6 +13,8 @@ void *_worker(void *args) {
 
   int64_t start, sleepTime, end, correction, aDuration, aFirstPts, aLastPTS,
       highResAudioPTS = 0;
+  int64_t videoFpsDur, vFcnt = 0, aFcnt = 0, nextAItt = 44;
+  double aErr = 0.0;
 
   int i = 0, ret;
   time_t now;
@@ -20,9 +22,11 @@ void *_worker(void *args) {
   uint32_t aBufOff, aBufLen;
   AVFrame *vFrame, *aFrame;
   uint8_t firstAudioSample = 1;
+  uint64_t videoFpsStart = av_gettime_relative();
 
   while (runThread) {
     rtmpStatus = checkRtmp();
+    // rtmpStatus = 1;  // TODO: remove this
 
     if (rtmpStatus == 1) {
       // align the start times after stream switch
@@ -70,6 +74,9 @@ void *_worker(void *args) {
           aFrame->pkt_duration = aDuration;
         }
       }
+
+      vFcnt++;
+      aFcnt += 1024;
     }
 
     else {
@@ -103,12 +110,30 @@ void *_worker(void *args) {
           videoPTS += VIDEO_PTS_OFF;
         }
 
-        // push empty audio
+        vFcnt++;
+      }
+
+      // push audio samples and correct if we have pushed too many
+      for (i = 0; i < nextAItt; i++) {
         filler.audioFiller->pts = audioPTS;
         filler.audioFiller->pkt_dts = audioPTS;
         aPush(filler.audioFiller);
         highResAudioPTS += AUDIO_PTS_OFF;
         audioPTS = highResAudioPTS / 1000;
+        aFcnt += 1024;
+      }
+
+      // aErr = aErr + (double)(1024 * 44.0 / 44100.0);
+      aErr += abs(44100 - 1024 * nextAItt);
+      // aErr = aErr ? aErr >= 0 : (-1) * aErr;
+      printf("$$$$$ Error --> %f\n", aErr);
+      if (aErr >= 1024) {
+        // if (aErr >= 1.0) {
+        nextAItt = 43;
+        aErr -= 1024;
+        printf("//////////////// error %f\n", aErr);
+      } else {
+        nextAItt = 44;
       }
 
       end = av_gettime_relative();
@@ -116,11 +141,24 @@ void *_worker(void *args) {
       if (sleepTime < 0) {
         printf("Warning::InputSwitch::Processing is to slow!!!!\n");
       } else {
+        printf("Sleept time %lu\n", sleepTime);
+
         av_usleep(sleepTime);
       }
     }
 
     lastRtmpStatus = rtmpStatus;
+
+    videoFpsDur = av_gettime_relative() - videoFpsStart;
+    if (videoFpsDur >= 1000000) {
+      printf("##### --> Video Rate=%f\n",
+             (double)vFcnt * 1000000 / (double)videoFpsDur);
+      printf("##### --> Audio Rate=%f\n",
+             (double)aFcnt * 1000000 / (double)videoFpsDur);
+      videoFpsStart = av_gettime_relative();
+      vFcnt = 0;
+      aFcnt = 0;
+    }
   }
 }
 
@@ -187,9 +225,10 @@ int prepareAudioFiller(AVFrame **frame) {
     exit(1);
   }
 
-  for (i = 0; i < (*frame)->nb_samples; i++) {
-    (*frame)->data[0][i] = 0;
-  }
+  (*frame)->data[0][0] = 0;
+  // for (i = 0; i < (*frame)->nb_samples; i++) {
+  //   (*frame)->data[0][i] = 0;
+  // }
 }
 
 int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
