@@ -51,5 +51,7 @@ Thumbs.db
 lib/ffmpeg/bin
 lib/ffmpeg/ffmpeg_build
 lib/ffmpeg/ffmpeg_sources
+test/rec
+test/dash
 
 ums

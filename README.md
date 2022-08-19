@@ -85,14 +85,124 @@ docker run -d -p 1935:1935 --name nginx-rtmp nginx-rtmp
 
   - x264 encoder is implemented in the output.c file.
 
-  # Implementation Status
+# Testing
 
-  Currently the input switching is implemented where the system plays filler if the RTMP input goes down, other wise it plays the RTMP input source. From there
-  it pushes the data to an RTMP output. Currently only the video path is implemented.
+## Setup
 
-  Next things to do:
+- ensure the docker container is started (instructions see above)
+- install mpv player
+  ```bash
+  sudo apt install mpv
+  ```
+- clone ![ums-test-utils](https://github.com/thomaskhub/ums-test-utils) repo
+- change TEST_BIN_PATH variable test/config.sh to point to the cloned ums-test-repo
+- build the ums appliocation with `make` command
+- go into the ./test directory and exucute the available tests
 
-  - test mpegts recording in main output module
-  - make parameters defined in main.c file changable with command line arguments
-  - implement the Dash / HLS output modules and the Dash muxer
-  - implement the audio path
+  - check_test_setup.sh
+
+    - check if all tools are installed to run the tests. Basically it will publish
+      an RTMP stream to the docker container and display it using mpv media player
+
+  - 001_basic_test.sh :
+
+    - starts ums to listen to rtmp input and output rtmp, mpegts recording and DASH/HLS
+
+    ```bash
+    #Open one terminal
+    cd ./test
+    ./001_basic_test.sh
+
+    #Open another terminal and execute this command to push video to rtmp input
+    cd ./test
+    ./rtmp_publish.sh
+
+    #Open another terminal and execute this command to display rtmp output
+    mpv rtmp://localhost/live/output
+
+    #Open another terminal and execute this command to display MPEGTS recording
+    mpv ./test/rec/rec.ts
+
+    ```
+
+## Test cases Live Mode
+
+A summery of what needs to be tested:
+
+### Filler Video selection
+
+- if RTMP input is failing filler video is generated from JPG files and pushed
+  instead of real video
+- We have to check that filler videos are properly played according to the program
+  timeline
+- Program time line is defined by three timestamps.
+  - streamStart --> this is the time where the camera stream is started by
+    the streaming team (camera system is turned on). System can be tested during this time.
+    - If rtmp input fails during this time we tell participant that we will start session soon
+  - sessionStart --> this is the time where the session start e.g. Sadhguru comes live
+    - if rtmp input fails during this time we inform participant that error has come
+  - sessionEnd --> this is the expected end of the program. But it does not mean that system
+    stops after this. I can happen that program might get extended.
+    - If rtmp input fails after this time we will show a black image
+- Filler video should be played according to these specs:
+  - if now is smaller then streamStart nothing should be pushed
+  - if now > streamStart && now < sessionStart --> push preSession filler (-preFiller argument of ums)
+  - if now >= sessionStart && nov < sessionEnd --> push session filler (-sessionFiller argument of ums)
+  - if now > sessionEnd --> push post session filler (-postFiller argument of ums)
+
+### Audio Video Sync (libsync)
+
+- we need to test libsync for long playing videos
+- we need to test libsync for videos when video transistions between filler video
+  and real data .e.g. run video for 15min, let filler play for 15min and repeat this.
+  At no point in time av-sync issues should be noticed (subjective testing)
+
+### Long running videos
+
+- System must run without any issues for up to 6hours generating correct
+  Dash/HLS, rtmp output and MPEGTS recording
+
+### Connect Streaming output to Youtube
+
+- need to check if the RTMP output is compatible with yoututbe and video
+  is running properly on youtube
+
+### Autorecovery if RTMP output breaks
+
+- if rtmp output connection breaks, e.g. youtube connection is interrupted
+  it should automatically reastablish the connection and play the current live
+  stream to youtube
+
+### Check MPEGTS recording
+
+- MPEGTS recording will be used to restream a live session at a later point
+  (e.g. restreaming the live session at a different time in a different timezone)
+- Convert MPEGTS recording to Dash/HLS Video-On-Demand files and test playback on
+  Shaka player
+
+### Test Dash/HLS
+
+- Test dash and hls streams on Isha Shaka player
+- Test Dash / HLS on Mobile phone, laptop, different devices.
+
+- # Implementation Status
+
+  - Live Mode
+    - Dash and HLS output is implemented
+    - RTMP input is implemented which is normalized to 720p, 2888000bps
+    - RTMP output is implemented for 720p stream
+    - MPEG TS recording is implemented for 720p stream
+  - Video On Demand [Not implemented Yet]
+    - [ ] Rename rtmpIn parameter to input and allow it to either specify a MPEGTS
+          recording, or rtmp input stream
+      - MPEGTS file must be processed as fast as possible
+      - Filler video generation can be disabled
+    - [ ] Disable RTMP output and MPEGTS recording for VOD. Only Dash/HLS is needed
+  - Video As Stream [Not implemented Yet]
+    - [ ] as in VOD make sure that we can speficy a input MPEGTS recording
+    - [ ] input file must be processed in realtime (see -re paramter in ffmpeg as example)
+    - [ ] Disable RTMP output and MPEGTS recording for VOD. Only Dash/HLS is needed
+
+```
+
+```
