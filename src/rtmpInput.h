@@ -28,7 +28,6 @@
 #include "filters.h"
 #include "mux.h"
 #include "utils.h"
-
 typedef struct {
   int audioSampleRate;
   uint64_t audioChannelLayout;
@@ -37,7 +36,6 @@ typedef struct {
   AVRational audioTimeBase;
 } RtmpInputInfo;
 
-// Video buffer to assemble 1s chunks
 AvBuffer rtmpInVBuffer;
 AvBuffer rtmpInABuffer;
 
@@ -48,10 +46,15 @@ typedef struct {
 } RtmpWorkerData;
 
 void rtmpInputStart(char *url);
-
 void rtmpInputStop();
 void rtmpInputJoin();
 
+/**
+ * @brief function to get the rtmp input status
+ * 1 means its running, 0 means its not running
+ *
+ * @return int
+ */
 int rtmpIsRunning();
 
 #endif

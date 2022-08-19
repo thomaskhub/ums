@@ -26,20 +26,17 @@
 
 typedef struct DashCtxT {
   /**
-   * @brief video and audio streams for the dash output
-   * 0 - 6 are video streams (0 being the best qualit, 6 the works quality)
-   * 7 is audio stream
+   * array of video streams used for dash output
    */
-  AVStream** dashStreams;
-  AVStream* dashASteam;
+  AVStream **dashStreams;
+  /** dash output audio stream (single audio stream only)*/
+  AVStream *dashASteam;
   uint8_t streamLen;
-  AVFormatContext* dashOutCtx;
+  AVFormatContext *dashOutCtx;
   AVRational timebase;
 
-  /**
-   * @brief path to the manifest file (index.mpd)
-   */
-  char* dashIndexPath;
+  /**path to the manifest file (index.mpd)*/
+  char *dashIndexPath;
 
 } DashCtxT;
 
@@ -50,8 +47,8 @@ typedef struct DashCtxT {
  * @param encoderCtx
  * @return int
  */
-int startDash(DashCtxT* data, AVCodecContext** encoderCtx,
-              AVCodecContext* aCodecCtx);
+int startDash(DashCtxT *data, AVCodecContext **encoderCtx,
+              AVCodecContext *aCodecCtx);
 
 /**
  * @brief write a packet to the dash mux
@@ -59,13 +56,13 @@ int startDash(DashCtxT* data, AVCodecContext** encoderCtx,
  * @param data
  * @param packet
  */
-void dashWritePacket(DashCtxT* data, AVPacket* packet);
+void dashWritePacket(DashCtxT *data, AVPacket *packet);
 
 /**
  * @brief release all resources allocated for the dash output
  *
  * @param data
  */
-void dashClose(DashCtxT* data);
+void dashClose(DashCtxT *data);
 
 #endif

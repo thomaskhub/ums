@@ -2,15 +2,6 @@
 
 int64_t startTime = 0;
 
-void initPTS() { startTime = av_gettime_relative(); }
-
-int64_t getPTS() { return (av_gettime_relative() - startTime); }
-
-int64_t getPTScaled(AVRational timebase) {
-  int64_t curPts = getPTS();
-  return av_rescale(curPts, timebase.den, timebase.num);
-}
-
 int getFrameFromImage(AVFormatContext **ctx, char *path,
                       AVFrame **pictureFrame) {
   int ret;
@@ -249,7 +240,6 @@ closeOutput:
   return ret;
 }
 
-// TODO: return an negative error if sscanf failed with wrong format
 time_t isoTimeToEpoch(char *isoTimestamp) {
   // 2021-09-26T16:46:02.642+00:00
   struct tm tstamp = {0};

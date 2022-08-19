@@ -33,12 +33,7 @@
 #define AUDIO_CH_LAYOUT AV_CH_LAYOUT_MONO
 #define AUDIO_PTS_OFF (uint32_t)(1000000000 / AUDIO_RATE)
 
-// 44 frames with 1024 samples each ->
-#define AUDIO_BUF_FRAME_CNT 45
-#define AAC_FRAME_SIZE 1024
-
 #define FILLER_VIDEO_FILTER "scale=1280:720,format=yuv420p"
-
 #define RTMPIN_VIDEO_FILTER "scale=1280:720,format=yuv420p,fps=fps=25"
 #define RTMPIN_AUDIO_FILTER "aresample=44100,aformat=channel_layouts=mono"
 

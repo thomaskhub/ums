@@ -62,7 +62,7 @@ void *worker(void *data) {
              "rtmpInput::Could not open rtmp input %i  url --> %s\n", ret,
              (char *)wData.url);
       sleep(3);
-      ret = 0;  // make sure we restart the loop
+      ret = 0; // make sure we restart the loop
       continue;
     }
 
@@ -146,8 +146,8 @@ void *worker(void *data) {
           }
 
           if (audioFrame->pts < inputVideo->start_time) {
-            break;  // read the nect packet and drop this frame until we
-                    // reache the start
+            break; // read the nect packet and drop this frame until we
+                   // reache the start
           }
 
           // printf("Debug::Audio:: %li  %li %li %li %li\n", audioFrame->pts,
@@ -192,7 +192,7 @@ void *worker(void *data) {
             goto freeAll;
           }
 
-          ret = avBufferPush2(&rtmpInABuffer, audioOutFrame);
+          ret = avBufferPush(&rtmpInABuffer, audioOutFrame);
           if (ret < 0) {
             av_log(NULL, AV_LOG_DEBUG, "rtmpInput::buffer full retry...\n");
             continue;
@@ -228,8 +228,8 @@ void *worker(void *data) {
           if (ret >= 0) {
             if (videoFrame->pts < inputVideo->start_time) {
               av_frame_unref(videoFrame);
-              break;  // read the nect packet and drop this frame until we
-                      // reache the start
+              break; // read the nect packet and drop this frame until we
+                     // reache the start
             }
 
             if (firstVideoFrame == 1) {
@@ -267,7 +267,7 @@ void *worker(void *data) {
               goto freeAll;
             }
 
-            ret = avBufferPush2(&rtmpInVBuffer, videoOutFrame);
+            ret = avBufferPush(&rtmpInVBuffer, videoOutFrame);
             if (ret < 0) {
               av_log(NULL, AV_LOG_DEBUG,
                      "rtmpInput::video buffer full retry...\n");
@@ -312,7 +312,7 @@ void *worker(void *data) {
       firstAudioFrame = 1;
     }
 
-    ret = 0;  // make sure we restart the loop
+    ret = 0; // make sure we restart the loop
   }
   printf("rtmp out of the loop\n");
   // Free all resource if rtmp input is stopepd which should never happen but

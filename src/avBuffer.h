@@ -24,43 +24,60 @@
 #include "config.h"
 
 typedef struct AvBuffer {
-  AVFrame **buffer;  // Array of AVFrame pointers
-  // uint8_t selectedBuffer;  // 0 first buffer, 1 second buffer
+  AVFrame **buffer;
   uint32_t frameCount;
   uint8_t wrPtr;
   uint8_t rdPtr;
-  // uint32_t off;
-  // uint32_t bufOffset[4];
   enum AVMediaType type;
   int nbSamples;
 } AvBuffer;
 
-typedef void (*PushHandler)(AvBuffer *buf, AVFrame **buffer,
-                            uint32_t frameCount, uint8_t bufId);
-
 /**
- * For processing the filler video we need to implement a double
- * buffer which can store 1s second of video data in each buffer.
+ * @brief initialize a simple ring buffer
  *
- * The buffer is a list of pointers to AVFrame objects. In the
- * initVideoBuffer function we will create an array of pointers
- * to AVFrames with allocated memory. We copy the input data into
- * the buffers so that input can release frame memory if needed.
- *
- * Audio and Video buffer will work a little differently internally.
- * For audio the we are allocation 44 frames each of which will hold
- * 1024 in total we could save 45,056 samples. As we a running at a sample rate
- * of 44100k we will have 43 frames with 1024 samples and the last frame will
- * only have 68 samples. This is needed to store exactly one second in the
- * buffer. But the last incoming audio frame will also have 1024, so 1024-68
- * frames need to be stored at the beginning of the next buffer
+ * @param buf buffer object
+ * @param frameCount number of frames the buffer should be able to store
+ * @param pixFmt pixel format if its a video buffer
+ * @param width image widht
+ * @param height  image height
+ * @param smpFmt sample format in case its a audio buffer
+ * @param nbSamples number of samples per frame for audio frames
+ * @param channelLayout audio channel layout
+ * @param type either AV_MEDIA_AUDIO or AV_MEDIA_VIDEO
+ * @return int
  */
 int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
                  int width, int height, enum AVSampleFormat smpFmt,
                  int nbSamples, uint64_t channelLayout, enum AVMediaType type);
 
-int avBufferPull2(AvBuffer *buf, AVFrame **frame);
-int avBufferPush2(AvBuffer *buf, AVFrame *frame);
+/**
+ * @brief pull a frame from the buffer if available
+ * return negative value if no frame is ready
+ *
+ * @param buf
+ * @param frame
+ * @return int
+ */
+int avBufferPull(AvBuffer *buf, AVFrame **frame);
+
+/**
+ * @brief push a frame into the ring buffer
+ * return negative value if buffer is full
+ *
+ * @param buf
+ * @param frame
+ * @return int
+ */
+int avBufferPush(AvBuffer *buf, AVFrame *frame);
+
+/**
+ * @brief check if buffer is full
+ * can be used to check if buffer is ready before pushing
+ * and frame into it
+ *
+ * @param buf
+ * @return uint8_t
+ */
 uint8_t avBufferFull(AvBuffer *buf);
 
 #endif

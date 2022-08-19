@@ -7,8 +7,8 @@ static uint8_t runThread = 1;
 void outputStopRtmp() { runThread = 0; }
 void outputRtmpJoin() { pthread_join(threadOpenRtmp, NULL); }
 
-static void* openRtmp(void* user) {
-  OutputCtxT* data = (OutputCtxT*)user;
+static void *openRtmp(void *user) {
+  OutputCtxT *data = (OutputCtxT *)user;
   while (runThread) {
     int ret;
     data->rtmpOutCtx = NULL;
@@ -60,7 +60,7 @@ static void* openRtmp(void* user) {
   }
 }
 
-static int openMpegtsRecording(OutputCtxT* ctx) {
+static int openMpegtsRecording(OutputCtxT *ctx) {
   int ret;
 
   ret = openOutput(&ctx->recCtx, ctx->path, &ctx->outAudioRec,
@@ -98,15 +98,8 @@ end:
   return ret;
 }
 
-int startOutput(OutputCtxT* ctx) {
+int startOutput(OutputCtxT *ctx) {
   int ret;
-
-  // if (video->type == AVMEDIA_TYPE_AUDIO) {
-  //   // TODO: for now skip audio  but needs to be implemented next
-  //   // Audio filerte on input has normaliyed sample rate, sample format and
-  //   // to mono output
-  //   return -1;
-  // }
 
   ctx->gop = 100;
   ctx->inWidth = VIDEO_WIDTH;
@@ -158,7 +151,7 @@ int startOutput(OutputCtxT* ctx) {
   }
 
   if (ctx->url) {
-    ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void*)ctx);
+    ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void *)ctx);
     if (ret < 0) {
       av_log(NULL, AV_LOG_WARNING,
              "output::not able to start rtmpOut thread\n");
@@ -217,15 +210,9 @@ closeCodec:
   return ret;
 }
 
-int outputWriteAudioPacket(OutputCtxT* output) {
+int outputWriteAudioPacket(OutputCtxT *output) {
   AVPacket *pkt, *recPacket, *rtmpPacket, *dashPacket;
   int ret;
-
-  // pkt = av_packet_clone(ctx->packet);
-  // av_packet_rescale_ts(pkt, ctx->timebase, output->audio->time_base);
-
-  // ret = av_interleaved_write_frame(output->recCtx, pkt);
-  // av_packet_unref(pkt);
 
   if (output->url && output->rtmpOutCtx && rtmpOutRunning) {
     // handle rtmp output if enabled
@@ -240,7 +227,7 @@ int outputWriteAudioPacket(OutputCtxT* output) {
   }
 
   if (output->path && output->recCtx) {
-    // // handle MPEGTS recording if enabled
+    // handle MPEGTS recording if enabled
     recPacket = av_packet_clone(output->audioEnc->packet);
 
     av_packet_rescale_ts(recPacket, output->timebase,
@@ -256,8 +243,7 @@ int outputWriteAudioPacket(OutputCtxT* output) {
     dashPacket = av_packet_clone(output->audioEnc->packet);
     dashPacket->stream_index = output->dashCtx->streamLen;
 
-    av_packet_rescale_ts(dashPacket, output->timebase,
-                         output->dashCtx->dashASteam->time_base);
+    av_packet_rescale_ts(dashPacket, output->timebase, output->dashCtx->dashASteam->time_base);
 
     dashWritePacket(output->dashCtx, dashPacket);
     av_packet_unref(dashPacket);
@@ -265,7 +251,7 @@ int outputWriteAudioPacket(OutputCtxT* output) {
   }
 }
 
-void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
+void outputWriteVideoFrame(OutputCtxT *data, AVFrame *frame) {
   int ret;
   AVPacket *recPacket, *rtmpPacket, *dashPacket;
 
@@ -292,7 +278,7 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
       exit(1);
     }
 
-    av_frame_unref(data->encoderFrame);  // TODO: not sure if that is good
+    av_frame_unref(data->encoderFrame); // TODO: not sure if that is good
 
   } else {
     ret = avcodec_send_frame(data->videoEncCtx, frame);
@@ -324,7 +310,7 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
         if (ret < 0) {
           // if we have some error on rtmp output restart it
           rtmpOutRunning = 0;
-          ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void*)data);
+          ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void *)data);
           if (ret < 0) {
             av_log(NULL, AV_LOG_WARNING,
                    "output::not able to start rtmpOut thread\n");
@@ -360,7 +346,7 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
   }
 }
 
-void outputClose(OutputCtxT* data) {
+void outputClose(OutputCtxT *data) {
   if (data->path && data->recCtx) {
     closeOutput(&data->recCtx);
   };

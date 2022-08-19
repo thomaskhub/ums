@@ -45,14 +45,12 @@ int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
     }
 
     buf->buffer[i] = frame;
-    // buf->bufOffset[i] = 0;
   }
 
   buf->frameCount = frameCount;
-  // buf->selectedBuffer = 0;
   buf->wrPtr = 0;
   buf->rdPtr = 0;
-  // buf->off = 0;
+
   return 0;
 }
 
@@ -64,7 +62,7 @@ uint8_t avBufferFull(AvBuffer *buf) {
   return (buf->wrPtr + 1) % buf->frameCount == buf->rdPtr;
 }
 
-int avBufferPush2(AvBuffer *buf, AVFrame *frame) {
+int avBufferPush(AvBuffer *buf, AVFrame *frame) {
   int ret;
   uint8_t full = avBufferFull(buf);
   char *t = buf->type == AVMEDIA_TYPE_VIDEO ? "video" : "audio";
@@ -105,7 +103,7 @@ int avBufferPush2(AvBuffer *buf, AVFrame *frame) {
   return 0;
 }
 
-int avBufferPull2(AvBuffer *buf, AVFrame **frame) {
+int avBufferPull(AvBuffer *buf, AVFrame **frame) {
   uint8_t empty = buf->wrPtr == buf->rdPtr;
 
   if (empty || !buf->buffer) {

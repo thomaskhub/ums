@@ -7,16 +7,35 @@
 #include "mux.h"
 
 typedef struct {
+  /*desired bitrate of the output audio stream*/
   int64_t bitrate;
-  AVCodecContext* encCtx;
-  AVCodec* encoder;
-  AVPacket* packet;
-  AVFrame* frame;
+
+  /*encoded packet which can be forwarded to muxers*/
+  AVPacket *packet;
+
+  /*frame that contains the data to be encoded*/
+  AVFrame *frame;
+
+  // internal use
+  AVCodecContext *encCtx;
+  AVCodec *encoder;
   AVRational timebase;
 } AudioEncCtx;
 
-int audioEncoderInit(AudioEncCtx* ctx);
+/**
+ * @brief initialize audio encoder
+ *
+ * @param ctx
+ * @return int
+ */
+int audioEncoderInit(AudioEncCtx *ctx);
 
-int audioEncoderRun(AudioEncCtx* ctx);
+/**
+ * @brief convert one audio frame
+ *
+ * @param ctx
+ * @return int
+ */
+int audioEncoderRun(AudioEncCtx *ctx);
 
 #endif

@@ -104,7 +104,13 @@ OutputCtxT vOutCfg[] = {
 };
 
 AudioEncCtx aOutCfg = {.bitrate = 64000};
+static DashCtxT dashCtx;
+static int cfgLength;
+static AVCodecContext **dashCodecList;
 
+/**
+ * @brief show help on how to use this application
+ */
 void showHelp() {
   printf("ums - uniterruptible media server\n");
   printf("Usage: ums [GNU long options] ...\n");
@@ -123,6 +129,20 @@ void showHelp() {
   printf("\t--sessionEnd ISO_TIMESTAMP   : session end ISO formated string\n");
 }
 
+/**
+ * @brief write frame to output modules
+ * this callback is triggered when the input module has a new audio frame
+ * which needs to be processes. First the audio frame is encoded according
+ * to our output specification (mono, 64kbits datarate, 44100kHz sampling).
+ * We will have only one audio datarate for the DASH ABR.
+ *
+ * Then it writes the frame to all the output modules which are:
+ *  - dash / hls
+ *  - rtmp output
+ *  - MPEGTS recording
+ *
+ * @param frame
+ */
 void switchPushAFrame(AVFrame *frame) {
   int i, cfgLength, ret;
   aOutCfg.frame = frame;
@@ -141,6 +161,13 @@ void switchPushAFrame(AVFrame *frame) {
   av_packet_unref(aOutCfg.packet);
 }
 
+/**
+ * @brief forwards video frame to output modules
+ * It forwards the video frame (720p) to the output modules. Inside the output
+ * output module the video frame is encoded in the differenc resolutions needed
+ * for the Dash / Hls ABR
+ * @param frame
+ */
 void switchPushVFrame(AVFrame *frame) {
   int i, cfgLength, ret;
 
@@ -149,10 +176,6 @@ void switchPushVFrame(AVFrame *frame) {
     outputWriteVideoFrame(&vOutCfg[i], frame);
   }
 }
-
-static DashCtxT dashCtx;
-static int cfgLength;
-static AVCodecContext **dashCodecList;
 
 /**
  * This is not 100% needed but to find memory leak with mtrace better to close
@@ -174,13 +197,13 @@ void signalCloseHandler(int signum) {
   exit(signum);
 }
 
-void checkForNull(const char *val, const char *name) {
-  if (val == NULL) {
-    printf("Error: %s argument failed\n", name);
-    exit(-1);
-  }
-}
-
+/**
+ * @brief check if string a starts with string b
+ *
+ * @param a
+ * @param b
+ * @return int
+ */
 int startsWith(const char *a, const char *b) {
   if (strncmp(a, b, strlen(b)) == 0) {
     return 1;
@@ -197,7 +220,7 @@ int startsWith(const char *a, const char *b) {
  */
 int validateInput() {
   int ret;
-  char *tmpString;
+  char tmpString[2048];
   DIR *dir;
 
   if (!mode) {
@@ -246,17 +269,19 @@ int validateInput() {
     }
 
     // check if manifest file path exists
-    tmpString = dirname(dashManifestPath);
+    strcpy(tmpString, dashManifestPath);
+    dirname(tmpString);
     dir = opendir(tmpString);
     if (!dir) {
       closedir(dir);
-      printf("Error: dash output directory cannot be opened");
+      printf("Error: dash output directory cannot be opened\n");
       return -1;
     }
     closedir(dir);
 
     // check if recording path exists
-    tmpString = dirname(recordPath);
+    strcpy(tmpString, recordPath);
+    dirname(tmpString);
     dir = opendir(tmpString);
     if (!dir) {
       closedir(dir);
@@ -272,16 +297,24 @@ int validateInput() {
   return -1;
 }
 
+/**
+ * @brief Of cource the entry point to the application :)
+ *
+ * @param argc
+ * @param argv
+ * @return int
+ */
 int main(int argc, char **argv) {
   int ret, i, c, optionIndex;
   char *dashDirName;
 
+  // if no parameters are being passes show the help
   if (argc < 2) {
     showHelp();
     return 1;
   }
 
-  // Parse the inout parameters
+  // Parse the input parameters
   while (1) {
     c = getopt_long_only(argc, argv, "", longOptions, &optionIndex);
     if (c == -1) {
@@ -330,14 +363,17 @@ int main(int argc, char **argv) {
     }
   }
 
+  // before we continue validate the input data
   if (validateInput() < 0) {
     return 1;
   };
 
+  // Rtmp output is optional, so if set we enable rtmp output for the high res output
   if (rtmpOutUrl) {
     vOutCfg[0].url = rtmpOutUrl;
   }
 
+  // MPEGTS recording is optional, so if set we enable recording for the high res output
   if (recordPath) {
     vOutCfg[0].path = recordPath;
   }
@@ -365,8 +401,6 @@ int main(int argc, char **argv) {
   }
 
   rtmpInputStart(rtmpInUrl);
-  // rtmpInputJoin();  // TODO: remove this, only to test and implement audio in
-  // the input
 
   ret = audioEncoderInit(&aOutCfg);
   if (ret < 0) {
@@ -381,9 +415,7 @@ int main(int argc, char **argv) {
     vOutCfg[i].audioEnc = &aOutCfg;
     ret = startOutput(&vOutCfg[i]);
     if (ret < 0) {
-      av_log(NULL, AV_LOG_WARNING,
-             "main::could not start output. stream index = %i\n", i);
-      // exit(1)
+      av_log(NULL, AV_LOG_WARNING, "main::could not start output. stream index = %i\n", i);
       continue;
     }
 

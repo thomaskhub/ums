@@ -49,7 +49,25 @@ void closeCodec(AVCodecContext **codec);
  */
 int openDecoder(AVCodecContext **decCtx, AVCodec **decoder, AVStream *stream);
 
+/**
+ * @brief initialize an encoder object
+ *
+ * @param encCtx
+ * @param encoder
+ * @param codecId
+ * @return int
+ */
 int initEncoder(AVCodecContext **encCtx, AVCodec **encoder, int codecId);
+
+/**
+ * @brief open the previously initilaized encoder
+ *
+ * @param encCtx
+ * @param encoder
+ * @param codecpar
+ * @param opt
+ * @return int
+ */
 int openEncoder(AVCodecContext **encCtx, AVCodec **encoder,
                 AVCodecParameters *codecpar, AVDictionary **opt);
 #endif

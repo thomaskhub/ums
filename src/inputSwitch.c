@@ -23,10 +23,10 @@ void *_worker(void *args) {
   AVFrame *vFrame, *aFrame;
   uint8_t firstAudioSample = 1;
   uint64_t videoFpsStart = av_gettime_relative();
+  uint64_t procStart = av_gettime_relative();
 
   while (runThread) {
     rtmpStatus = checkRtmp();
-    // rtmpStatus = 1;  // TODO: remove this
 
     if (rtmpStatus == 1) {
       // align the start times after stream switch
@@ -35,23 +35,22 @@ void *_worker(void *args) {
         audioPTS = videoPTS;
       }
 
-      ret = avBufferPull2(&rtmpInVBuffer, &vFrame);
+      ret = avBufferPull(&rtmpInVBuffer, &vFrame);
       if (ret < 0 && ret != AVERROR(EAGAIN)) {
-        av_log(NULL, AV_LOG_FATAL,
-               "inputSwitch::rtmp video buffer unknown error\n");
+        av_log(NULL, AV_LOG_FATAL, "inputSwitch::rtmp video buffer unknown error\n");
         exit(1);
       } else if (ret >= 0) {
         vFrame->pts = videoPTS;
         vFrame->pkt_dts = videoPTS;
         vPush(vFrame);
         videoPTS += VIDEO_PTS_OFF;
+        vFcnt++;
       }
 
       // audio
-      ret = avBufferPull2(&rtmpInABuffer, &aFrame);
+      ret = avBufferPull(&rtmpInABuffer, &aFrame);
       if (ret < 0 && ret != AVERROR(EAGAIN)) {
-        av_log(NULL, AV_LOG_FATAL,
-               "inputSwitch::rtmp audio buffer unknown error\n");
+        av_log(NULL, AV_LOG_FATAL, "inputSwitch::rtmp audio buffer unknown error\n");
         exit(1);
       }
 
@@ -73,10 +72,8 @@ void *_worker(void *args) {
           audioPTS += aDuration;
           aFrame->pkt_duration = aDuration;
         }
+        aFcnt += 1024;
       }
-
-      vFcnt++;
-      aFcnt += 1024;
     }
 
     else {
@@ -123,15 +120,10 @@ void *_worker(void *args) {
         aFcnt += 1024;
       }
 
-      // aErr = aErr + (double)(1024 * 44.0 / 44100.0);
       aErr += abs(44100 - 1024 * nextAItt);
-      // aErr = aErr ? aErr >= 0 : (-1) * aErr;
-      printf("$$$$$ Error --> %f\n", aErr);
       if (aErr >= 1024) {
-        // if (aErr >= 1.0) {
         nextAItt = 43;
         aErr -= 1024;
-        printf("//////////////// error %f\n", aErr);
       } else {
         nextAItt = 44;
       }
@@ -139,16 +131,17 @@ void *_worker(void *args) {
       end = av_gettime_relative();
       sleepTime = 1000000 - (end - start);
       if (sleepTime < 0) {
-        printf("Warning::InputSwitch::Processing is to slow!!!!\n");
+        av_log(NULL, AV_LOG_WARNING, "InputSwith processing is too slow\n");
       } else {
-        printf("Sleept time %lu\n", sleepTime);
-
         av_usleep(sleepTime);
       }
     }
 
     lastRtmpStatus = rtmpStatus;
 
+    // Processing status::
+    // TODO: we need to push this either into redis or directly into the db
+    // so that it will be available in the frontend to display statistics
     videoFpsDur = av_gettime_relative() - videoFpsStart;
     if (videoFpsDur >= 1000000) {
       printf("##### --> Video Rate=%f\n",
@@ -156,6 +149,7 @@ void *_worker(void *args) {
       printf("##### --> Audio Rate=%f\n",
              (double)aFcnt * 1000000 / (double)videoFpsDur);
       videoFpsStart = av_gettime_relative();
+      printf("### runtime --> %lu\n", (av_gettime_relative() - procStart) / 1000000);
       vFcnt = 0;
       aFcnt = 0;
     }
@@ -173,8 +167,7 @@ int prepareVideoFiller(char *path, AVFrame **frame) {
 
   ret = getFrameFromImage(&inCtx, path, &imgFrame);
   if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR,
-           "inputSwitch::could not read frame from image\n");
+    av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not read frame from image\n");
     return ret;
   }
 
@@ -226,9 +219,6 @@ int prepareAudioFiller(AVFrame **frame) {
   }
 
   (*frame)->data[0][0] = 0;
-  // for (i = 0; i < (*frame)->nb_samples; i++) {
-  //   (*frame)->data[0][i] = 0;
-  // }
 }
 
 int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
@@ -271,9 +261,6 @@ int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
     goto freePost;
   }
 
-  // TODO: implment error handling is time strings are not propper
-  // format. for now we assume the one calling this function will
-  // ensure this.
   filler.sessionStart = isoTimeToEpoch(sessionStart);
   filler.sessionEnd = isoTimeToEpoch(sessionEnd);
   filler.streamStart = isoTimeToEpoch(streamStart);

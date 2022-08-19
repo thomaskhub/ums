@@ -1,6 +1,6 @@
 #include "audioEncoder.h"
 
-int audioEncoderInit(AudioEncCtx* ctx) {
+int audioEncoderInit(AudioEncCtx *ctx) {
   int ret;
   ret = initEncoder(&ctx->encCtx, &ctx->encoder, AV_CODEC_ID_AAC);
   if (ret < 0) {
@@ -9,7 +9,6 @@ int audioEncoderInit(AudioEncCtx* ctx) {
   }
 
   ctx->timebase = ctx->encCtx->time_base;
-
   ctx->encCtx->bit_rate = ctx->bitrate;
   ctx->encCtx->sample_fmt = AUDIO_SAMPLE_FMT;
   ctx->encCtx->sample_rate = AUDIO_RATE;
@@ -36,7 +35,7 @@ closeCodec:
   return ret;
 }
 
-int audioEncoderRun(AudioEncCtx* ctx) {
+int audioEncoderRun(AudioEncCtx *ctx) {
   int ret;
 
   ret = avcodec_send_frame(ctx->encCtx, ctx->frame);
@@ -48,7 +47,6 @@ int audioEncoderRun(AudioEncCtx* ctx) {
     exit(1);
   }
 
-  // while (ret >= 0) {
   ret = avcodec_receive_packet(ctx->encCtx, ctx->packet);
   if (ret == AVERROR(EAGAIN)) {
     return ret;
@@ -58,5 +56,4 @@ int audioEncoderRun(AudioEncCtx* ctx) {
     av_log(NULL, AV_LOG_ERROR, "audioEncoder::encoder packet rec failed\n");
     exit(1);
   }
-  // }
 }

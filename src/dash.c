@@ -1,13 +1,10 @@
 #include "dash.h"
 
-static int openDash(DashCtxT* data, AVCodecContext** encoderCtx,
-                    AVCodecContext* aCodecCtx) {
+static int openDash(DashCtxT *data, AVCodecContext **encoderCtx,
+                    AVCodecContext *aCodecCtx) {
   int ret, i;
-  AVDictionary* opts = NULL;
+  AVDictionary *opts = NULL;
   data->dashOutCtx = NULL;
-
-  // TODO: add audio stream to the data and make sure we add it to the
-  // dash output
 
   ret = avformat_alloc_output_context2(&data->dashOutCtx, NULL, "dash",
                                        data->dashIndexPath);
@@ -49,8 +46,6 @@ static int openDash(DashCtxT* data, AVCodecContext** encoderCtx,
   }
 
   av_dict_set(&opts, "init_seg_name", "init$RepresentationID$.$ext$", 0);
-  // av_dict_set(&opts, "media_seg_name",
-  // "$RepresentationID$.$Number%05d$.$ext$", 0);
   av_dict_set(&opts, "media_seg_name", "$RepresentationID$.$Number$.$ext$", 0);
   av_dict_set(&opts, "use_template", "1", 0);
   av_dict_set(&opts, "use_timeline", "1", 0);
@@ -74,12 +69,12 @@ end:
   return ret;
 }
 
-int startDash(DashCtxT* data, AVCodecContext** encoderCtx,
-              AVCodecContext* aCodecCtx) {
+int startDash(DashCtxT *data, AVCodecContext **encoderCtx,
+              AVCodecContext *aCodecCtx) {
   int ret;
   data->dashOutCtx = NULL;
 
-  data->dashStreams = malloc(data->streamLen * sizeof(AVStream*));
+  data->dashStreams = malloc(data->streamLen * sizeof(AVStream *));
   if (!data->dashStreams) {
     av_log(NULL, AV_LOG_ERROR,
            "startDash::not able to allocate stream memory\n");
@@ -94,7 +89,7 @@ int startDash(DashCtxT* data, AVCodecContext** encoderCtx,
   }
 }
 
-void dashWritePacket(DashCtxT* data, AVPacket* packet) {
+void dashWritePacket(DashCtxT *data, AVPacket *packet) {
   int ret;
   ret = av_interleaved_write_frame(data->dashOutCtx, packet);
   if (ret < 0) {
@@ -102,7 +97,7 @@ void dashWritePacket(DashCtxT* data, AVPacket* packet) {
   }
 }
 
-void dashClose(DashCtxT* data) {
+void dashClose(DashCtxT *data) {
   free(data->dashStreams);
   closeOutput(&data->dashOutCtx);
 }

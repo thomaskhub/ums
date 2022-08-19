@@ -79,16 +79,6 @@ int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
     goto freeFilterGraph;
   }
 
-  //   ret = av_opt_set_int_list(&ctx->sinkCtx, "pix_fmts", pixFmts,
-  //   AV_PIX_FMT_NONE,
-  //                             AV_OPT_SEARCH_CHILDREN);
-
-  //   if (ret < 0) {
-  //     printf("Error::initAvFilter::could not set sink pixel formats\n");
-  //     ret = AVERROR(ENOMEM);
-  //     goto freeFilterGraph;
-  //   }
-
   ctx->out->name = av_strdup("in");
   ctx->out->filter_ctx = ctx->srcCtx;
   ctx->out->pad_idx = 0;

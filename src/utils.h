@@ -29,10 +29,6 @@
 #include "config.h"
 #include "mux.h"
 
-void initPTS();
-int64_t getPTS();
-int64_t getPTScaled(AVRational timebase);
-
 /**
  * @brief Get the Frame From Image object
  *
@@ -59,8 +55,38 @@ int getEmptyAvFrame(AVFrame **frame, int pixFmt, int width, int height,
  */
 int writeFrameToJpeg(AVFrame *frame, char *path);
 
+/**
+ * @brief convert ISO string time to epoch time
+ *
+ * @param isoTimestamp
+ * @return time_t
+ */
 time_t isoTimeToEpoch(char *isoTimestamp);
+
+/**
+ * @brief get the current time as iso formated string
+ *
+ * @param isoTimeString
+ * @return int
+ */
 int getNowAsIso(char **isoTimeString);
+
+/**
+ * @brief can be used to clean up dash dir. All
+ * files in dash dir will be removed so be carefull what
+ * directory is passed
+ *
+ * @param path
+ */
 void cleanDashDir(const char *path);
+
+/**
+ * @brief Create a directory if non existing and
+ * we have permission to write to the specified
+ * path.
+ *
+ * @param path
+ * @return int
+ */
 int mkdirP(const char *path);
 #endif

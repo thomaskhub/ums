@@ -29,10 +29,10 @@
 #include "utils.h"
 
 typedef struct {
-  const char* name;
+  const char *name;
   int64_t bitrate;
-  char* url;   // output rtmp url. If NULL nor rtmp output enabled
-  char* path;  // path to recodring file. if null recodring is disabled
+  char *url;  // output rtmp url. If NULL nor rtmp output enabled
+  char *path; // path to recodring file. if null recodring is disabled
   int gop;
   int inWidth;
   int inHeight;
@@ -49,21 +49,21 @@ typedef struct {
   uint8_t handleDashAudio;
   uint8_t filterEna;
   AVRational timebase;
-  AVFormatContext* rtmpOutCtx;
+  AVFormatContext *rtmpOutCtx;
   AVRational sampleAspectRatio;
-  AVFormatContext* recCtx;
+  AVFormatContext *recCtx;
   AVStream *outVideoRec, *outAudioRec;
   AvFilter vFilter;
   char filterDesc[128];
   AVStream *outVideoRtmp, *outAudioRtmp;
-  AVCodecContext* videoEncCtx;
+  AVCodecContext *videoEncCtx;
   // AVCodecContext* audioEncCtx;
-  AVCodec* videoEncoder;
+  AVCodec *videoEncoder;
   // AVCodec* audioEncoder;
-  AVPacket* packet;
-  AVFrame* encoderFrame;
-  DashCtxT* dashCtx;
-  AudioEncCtx* audioEnc;
+  AVPacket *packet;
+  AVFrame *encoderFrame;
+  DashCtxT *dashCtx;
+  AudioEncCtx *audioEnc;
 } OutputCtxT;
 
 /**
@@ -73,15 +73,15 @@ typedef struct {
  *
  * @param frame
  */
-void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame);
-int outputWriteAudioPacket(OutputCtxT* output);
+void outputWriteAudioFrame(OutputCtxT *data, AVFrame *frame);
+int outputWriteAudioPacket(OutputCtxT *output);
 /**
  * @brief take the input video frame and push it through
  * the encoder and then either into rtmp out, recording out
  * or dash/hls output
  * @param frame
  */
-void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame);
+void outputWriteVideoFrame(OutputCtxT *data, AVFrame *frame);
 
 /**
  * @brief start the output processing
@@ -89,13 +89,13 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame);
  * @param data
  * @return int
  */
-int startOutput(OutputCtxT* ctx);
+int startOutput(OutputCtxT *ctx);
 
 /**
  * @brief clean up all resources allocated for the output
  *
  * @param data
  */
-void outputClose(OutputCtxT* data);
+void outputClose(OutputCtxT *data);
 
 #endif
