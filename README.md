@@ -57,14 +57,12 @@ file -> settings -> Extensions --> C/C++ --> Clang_format_fallback Style = googl
    ![MakefileSettingsDebug](doc/images/makefile-debug.png)
    ![MakefileSettingsDebug](doc/images/makefile-build.png)
 
-# Start RTMP docker
+# Install RTMP docker
 
-```bash
-cd docker
-./build.sh
-
-docker run -d -p 1935:1935 --name nginx-rtmp nginx-rtmp
-```
+For testing purposes or running ums in production environment we
+have setup a docker container which setup a nginx-rtmp server.
+Please check out the [nginx-rtmp repo](https://github.com/thomaskhub/nginx-rtmp)
+for detail on how to build and start the RTMP docker container.
 
 # System description
 
