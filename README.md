@@ -57,12 +57,47 @@ file -> settings -> Extensions --> C/C++ --> Clang_format_fallback Style = googl
    ![MakefileSettingsDebug](doc/images/makefile-debug.png)
    ![MakefileSettingsDebug](doc/images/makefile-build.png)
 
-# Install RTMP docker
+# Docker images
+
+## Install RTMP docker
 
 For testing purposes or running ums in production environment we
 have setup a docker container which setup a nginx-rtmp server.
 Please check out the [nginx-rtmp repo](https://github.com/thomaskhub/nginx-rtmp)
 for detail on how to build and start the RTMP docker container.
+
+## ums docker image
+
+The projects [Dockerfile](./Dockerfile) will create a docker image that can be used to compile the libraries, compile the ums application or run ums application.
+
+```bash
+#Build the image
+docker build -t ums .
+
+#Compile the ffmpeg library
+docker run --rm -v $(pwd)/lib/ffmpeg:/ffmpeg ums /bin/sh /ffmpeg/compile.sh
+
+#Compile the ums application for production
+docker run --rm -v $(pwd):/source \
+  -e PKG_CONFIG_PATH="./lib/ffmpeg/ffmpeg_build/lib/pkgconfig" \
+  -w /source ums /usr/bin/make
+
+#Compile the ums application for development
+docker run --rm -v $(pwd):/source -w /source ums /usr/bin/make debug
+
+#Run the ums application in the docker container
+#Application must have been compiled before calling this command
+docker run --rm -v $(pwd):/source -w /source\
+ ums ./ums \
+  -rtmpIn rtmp://localhost/live/input \
+  -rtmpOut rtmp://localhost/live/output \
+  -dash ./dash/index.mpd \
+  -rec ./rec/rec.ts \
+  -preFiller ..../english-pre-filler.jpg \
+  -sessionFiller ..../english-session-filler.jpg \
+  -postFiller ..../english-post-filler.jpg
+
+```
 
 # System description
 
@@ -76,9 +111,9 @@ for detail on how to build and start the RTMP docker container.
 - the rtmp inputSwitch.c will read the rtmp chunk buffer and forward the frames to the output modules.
   - If rtmp input goes down the switch uses preloaded frames from a jpg file instead so that stream never interrupts.
   - three different fillers are being played depending on the wallclock time and the event configuration
-- the main output module will forward the video files to another RMTP server (16-07-2022 Implemented until here)
-  - it can also optionaly store the video chunks in a MPEGTS file
-  - and it also forwards it the the Dash muxer
+- the main output module will forward the video files to another RTMP server (16-07-2022 Implemented until here)
+  - it can also optionally store the video chunks in a MPEGTS file
+  - and it also forwards it the the Dash mux
 - As Dash/HLS are ABR protocols each output needs to create different bandwidth and resolutions.
 
   - x264 encoder is implemented in the output.c file.
@@ -94,8 +129,8 @@ for detail on how to build and start the RTMP docker container.
   ```
 - clone ![ums-test-utils](https://github.com/thomaskhub/ums-test-utils) repo
 - change TEST_BIN_PATH variable test/config.sh to point to the cloned ums-test-repo
-- build the ums appliocation with `make` command
-- go into the ./test directory and exucute the available tests
+- build the ums application with `make` command
+- go into the ./test directory and execute the available tests
 
   - check_test_setup.sh
 
@@ -137,7 +172,7 @@ A summery of what needs to be tested:
   - streamStart --> this is the time where the camera stream is started by
     the streaming team (camera system is turned on). System can be tested during this time.
     - If rtmp input fails during this time we tell participant that we will start session soon
-  - sessionStart --> this is the time where the session start e.g. Sadhguru comes live
+  - sessionStart --> this is the time where the session starts
     - if rtmp input fails during this time we inform participant that error has come
   - sessionEnd --> this is the expected end of the program. But it does not mean that system
     stops after this. I can happen that program might get extended.
@@ -151,7 +186,7 @@ A summery of what needs to be tested:
 ### Audio Video Sync (libsync)
 
 - we need to test libsync for long playing videos
-- we need to test libsync for videos when video transistions between filler video
+- we need to test libsync for videos when video transitions between filler video
   and real data .e.g. run video for 15min, let filler play for 15min and repeat this.
   At no point in time av-sync issues should be noticed (subjective testing)
 
@@ -168,7 +203,7 @@ A summery of what needs to be tested:
 ### Autorecovery if RTMP output breaks
 
 - if rtmp output connection breaks, e.g. youtube connection is interrupted
-  it should automatically reastablish the connection and play the current live
+  it should automatically reestablish the connection and play the current live
   stream to youtube
 
 ### Check MPEGTS recording
@@ -197,8 +232,8 @@ A summery of what needs to be tested:
       - Filler video generation can be disabled
     - [ ] Disable RTMP output and MPEGTS recording for VOD. Only Dash/HLS is needed
   - Video As Stream [Not implemented Yet]
-    - [ ] as in VOD make sure that we can speficy a input MPEGTS recording
-    - [ ] input file must be processed in realtime (see -re paramter in ffmpeg as example)
+    - [ ] as in VOD make sure that we can specify a input MPEGTS recording
+    - [ ] input file must be processed in realtime (see -re parameter in ffmpeg as example)
     - [ ] Disable RTMP output and MPEGTS recording for VOD. Only Dash/HLS is needed
 
 ```

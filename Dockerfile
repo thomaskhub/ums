@@ -1,5 +1,7 @@
-export DEBIAN_FRONTEND=noninteractive
-sudo apt-get update -qq && sudo apt-get -y install \
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND noninteractive
+RUN apt-get update && apt-get install -y \
     autoconf \
     automake \
     build-essential \
@@ -7,6 +9,7 @@ sudo apt-get update -qq && sudo apt-get -y install \
     git-core \
     libass-dev \
     libfreetype6-dev \
+    libunistring-dev \
     libgnutls28-dev \
     libmp3lame-dev \
     libsdl2-dev \
@@ -17,10 +20,12 @@ sudo apt-get update -qq && sudo apt-get -y install \
     libxcb1-dev \
     libxcb-shm0-dev \
     libxcb-xfixes0-dev \
+    libgnutls28-dev \
     meson \
     ninja-build \
     pkg-config \
     texinfo \
+    lzma \
     wget \
     yasm \
     zlib1g-dev \
