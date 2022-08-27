@@ -247,6 +247,25 @@ int validateInput() {
       return -1;
     }
 
+    // check filler files only in live mode, all other modes do not need this
+    if (strcmp(mode, "live") == 0) {
+
+      if (!fileExists(preFiller)) {
+        printf("Error: pre filler file not found\n");
+        return -1;
+      }
+
+      if (!fileExists(sessionFiller)) {
+        printf("Error: session filler file not found\n");
+        return -1;
+      }
+
+      if (!fileExists(postFiller)) {
+        printf("Error: post filler file not found\n");
+        return -1;
+      }
+    }
+
     if (streamStart == NULL)
       getNowAsIso(&streamStart);
 
