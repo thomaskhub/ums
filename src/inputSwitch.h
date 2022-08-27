@@ -1,5 +1,5 @@
 /**
-* Copyright (C) 2022  Thomas Kinder
+* Copyright (C) 2022  The World
 *
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -23,12 +23,12 @@
 #include <libavutil/time.h>
 #include <pthread.h>
 
+#include "avBuffer.h"
 #include "config.h"
 #include "filters.h"
 #include "mux.h"
 #include "rtmpInput.h"
 #include "utils.h"
-#include "videoBuffer.h"
 
 typedef void (*PushVideo)(AVFrame *frame);
 typedef void (*PushAudio)(AVFrame *frame);
@@ -38,9 +38,7 @@ typedef struct Filler {
   AVFrame *vPreFiller;
   AVFrame *vSessionFiller;
   AVFrame *vPostFiller;
-  AVFrame *aPreFiller;
-  AVFrame *aSessionFiller;
-  AVFrame *aPostFiller;
+  AVFrame *audioFiller;
   time_t streamStart;
   time_t sessionStart;
   time_t sessionEnd;

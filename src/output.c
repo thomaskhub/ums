@@ -7,8 +7,8 @@ static uint8_t runThread = 1;
 void outputStopRtmp() { runThread = 0; }
 void outputRtmpJoin() { pthread_join(threadOpenRtmp, NULL); }
 
-static void* openRtmp(void* user) {
-  OutputCtxT* data = (OutputCtxT*)user;
+static void *openRtmp(void *user) {
+  OutputCtxT *data = (OutputCtxT *)user;
   while (runThread) {
     int ret;
     data->rtmpOutCtx = NULL;
@@ -25,6 +25,14 @@ static void* openRtmp(void* user) {
 
     ret = avcodec_parameters_from_context(data->outVideoRtmp->codecpar,
                                           data->videoEncCtx);
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR,
+             "openRtmp::could not setup video codec params\n");
+      goto closeOutput;
+    }
+
+    ret = avcodec_parameters_from_context(data->outAudioRtmp->codecpar,
+                                          data->audioEnc->encCtx);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR,
              "openRtmp::could not setup video codec params\n");
@@ -52,24 +60,31 @@ static void* openRtmp(void* user) {
   }
 }
 
-static int openMpegtsRecording(OutputCtxT* data) {
+static int openMpegtsRecording(OutputCtxT *ctx) {
   int ret;
 
-  ret = openOutput(&data->recCtx, data->path, &data->outAudioRec,
-                   &data->outVideoRec, "mpegts");
+  ret = openOutput(&ctx->recCtx, ctx->path, &ctx->outAudioRec,
+                   &ctx->outVideoRec, "mpegts");
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "openRec::could not open recoding output\n");
     goto end;
   }
 
-  ret = avcodec_parameters_from_context(data->outVideoRec->codecpar,
-                                        data->videoEncCtx);
+  ret = avcodec_parameters_from_context(ctx->outVideoRec->codecpar,
+                                        ctx->videoEncCtx);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "openRec::could not open recoding output\n");
     goto closeOutput;
   }
 
-  ret = avformat_write_header(data->recCtx, NULL);
+  ret = avcodec_parameters_from_context(ctx->outAudioRec->codecpar,
+                                        ctx->audioEnc->encCtx);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "openRec::could not open recoding output\n");
+    goto closeOutput;
+  }
+
+  ret = avformat_write_header(ctx->recCtx, NULL);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "openRec::could not write rtmp out header\n");
     goto closeOutput;
@@ -77,133 +92,177 @@ static int openMpegtsRecording(OutputCtxT* data) {
   return 0;
 
 closeOutput:
-  closeOutput(&data->rtmpOutCtx);
+  closeOutput(&ctx->recCtx);
 end:
-  data->recCtx = NULL;
+  ctx->recCtx = NULL;
   return ret;
 }
 
-int startOutput(OutputCtxT* data) {
+int startOutput(OutputCtxT *ctx) {
   int ret;
 
-  data->gop = 100;
-  data->inWidth = VIDEO_WIDTH;
-  data->inHeight = VIDEO_HEIGHT;
-  data->format = VIDEO_PIX_FMT;
-  data->timebase.num = VIDEO_TIMEBASE_NUM;
-  data->timebase.den = VIDEO_TIMEBASE_DEN;
-  data->sampleAspectRatio.den = 1;
-  data->sampleAspectRatio.num = 1;
+  ctx->gop = 100;
+  ctx->inWidth = VIDEO_WIDTH;
+  ctx->inHeight = VIDEO_HEIGHT;
+  ctx->format = VIDEO_PIX_FMT;
+  ctx->timebase.num = VIDEO_TIMEBASE_NUM;
+  ctx->timebase.den = VIDEO_TIMEBASE_DEN;
+  ctx->sampleAspectRatio.den = 1;
+  ctx->sampleAspectRatio.num = 1;
 
-  data->videoEncCtx = NULL;
-  data->recCtx = NULL;
+  ctx->videoEncCtx = NULL;
+  ctx->recCtx = NULL;
 
-  ret = initEncoder(&data->videoEncCtx, &data->videoEncoder, AV_CODEC_ID_H264);
+  ret = initEncoder(&ctx->videoEncCtx, &ctx->videoEncoder, AV_CODEC_ID_H264);
   if (ret < 0) {
     printf("Could not init video encoder ...\n");
     return ret;
   }
 
-  data->videoEncCtx->height = data->outHeight;
-  data->videoEncCtx->width = data->outWidth;
-  data->videoEncCtx->sample_aspect_ratio = data->sampleAspectRatio;
-  data->videoEncCtx->pix_fmt = data->format;
-  data->videoEncCtx->time_base = data->timebase;
-  data->videoEncCtx->bit_rate = data->bitrate;
-  data->videoEncCtx->keyint_min = data->gop;
-  data->videoEncCtx->gop_size = data->gop;
-  data->videoEncCtx->rc_buffer_size = data->videoEncCtx->bit_rate;
-  data->videoEncCtx->rc_max_rate = data->videoEncCtx->bit_rate;
-  data->videoEncCtx->colorspace = AVCOL_SPC_BT709;
-  data->videoEncCtx->color_trc = AVCOL_TRC_BT709;
-  data->videoEncCtx->color_primaries = AVCOL_PRI_BT709;
+  ctx->videoEncCtx->height = ctx->outHeight;
+  ctx->videoEncCtx->width = ctx->outWidth;
+  ctx->videoEncCtx->sample_aspect_ratio = ctx->sampleAspectRatio;
+  ctx->videoEncCtx->pix_fmt = ctx->format;
+  ctx->videoEncCtx->time_base = ctx->timebase;
+  ctx->videoEncCtx->bit_rate = ctx->bitrate;
+  ctx->videoEncCtx->keyint_min = ctx->gop;
+  ctx->videoEncCtx->gop_size = ctx->gop;
+  ctx->videoEncCtx->rc_buffer_size = ctx->videoEncCtx->bit_rate;
+  ctx->videoEncCtx->rc_max_rate = ctx->videoEncCtx->bit_rate;
+  ctx->videoEncCtx->colorspace = AVCOL_SPC_BT709;
+  ctx->videoEncCtx->color_trc = AVCOL_TRC_BT709;
+  ctx->videoEncCtx->color_primaries = AVCOL_PRI_BT709;
+  ctx->videoEncCtx->flags = AV_CODEC_FLAG_GLOBAL_HEADER;
 
-  av_opt_set(data->videoEncCtx->priv_data, "preset", "veryfast", 0);
-  av_opt_set(data->videoEncCtx->priv_data, "tune", "stillimage", 0);
+  av_opt_set(ctx->videoEncCtx->priv_data, "level", "3.1", 0);
+  av_opt_set(ctx->videoEncCtx->priv_data, "preset", "veryfast", 0);
+  av_opt_set(ctx->videoEncCtx->priv_data, "tune", "stillimage", 0);
+  av_opt_set(ctx->videoEncCtx->priv_data, "profile", "high", 0);
 
-  ret = avcodec_open2(data->videoEncCtx, data->videoEncoder, NULL);
+  ret = avcodec_open2(ctx->videoEncCtx, ctx->videoEncoder, NULL);
   if (ret < 0) {
     closeCodec;
   }
 
-  data->packet = av_packet_alloc();
-  if (!data->packet) {
+  ctx->packet = av_packet_alloc();
+  if (!ctx->packet) {
     av_log(NULL, AV_LOG_ERROR, "output:: not able to allocate packet\n");
     goto closeCodec;
   }
 
-  if (data->url) {
-    ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void*)data);
+  if (ctx->url) {
+    ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void *)ctx);
     if (ret < 0) {
       av_log(NULL, AV_LOG_WARNING,
              "output::not able to start rtmpOut thread\n");
     }
   }
 
-  if (data->path) {
-    data->recCtx = NULL;
-    ret = openMpegtsRecording(data);
+  if (ctx->path) {
+    ctx->recCtx = NULL;
+    ret = openMpegtsRecording(ctx);
     if (ret < 0) {
       av_log(NULL, AV_LOG_WARNING,
              "output::not able to write recording file\n");
     }
   }
 
-  if (data->inWidth != data->outWidth || data->inHeight != data->outHeight) {
-    data->filterEna = 1;
-    snprintf(data->filterDesc, 128, "scale=%d:%d", data->outWidth,
-             data->outHeight);
+  if (ctx->inWidth != ctx->outWidth || ctx->inHeight != ctx->outHeight) {
+    ctx->filterEna = 1;
+    snprintf(ctx->filterDesc, 128, "scale=%d:%d", ctx->outWidth,
+             ctx->outHeight);
 
-    ret = initVideoFilter(&data->vFilter, data->filterDesc, data->inWidth,
-                          data->inHeight, data->format, data->timebase,
-                          data->sampleAspectRatio);
+    ret = initAvFilter(&ctx->vFilter, ctx->filterDesc, ctx->inWidth,
+                       ctx->inHeight, ctx->format, ctx->timebase,
+                       ctx->sampleAspectRatio, 0, 0, 0, AVMEDIA_TYPE_VIDEO);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR, "output::could not init video filter\n");
       goto closeRecordingOut;
     }
 
-    ret = getEmptyVideoFrame(&data->encoderFrame, data->format, data->outWidth,
-                             data->outHeight);
+    ret = getEmptyAvFrame(&ctx->encoderFrame, ctx->format, ctx->outWidth,
+                          ctx->outHeight, 0, 0, 0, AVMEDIA_TYPE_VIDEO);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR, "inputSwitch::could not create empty video\n");
       goto closeRecordingOut;
     }
 
   } else {
-    data->filterEna = 0;
+    ctx->filterEna = 0;
   }
 
   return 0;
 
 closeRecordingOut:
-  if (data->path && data->recCtx) {
-    closeOutput(&data->recCtx);
+  if (ctx->path && ctx->recCtx) {
+    closeOutput(&ctx->recCtx);
   };
 closeRtmpOut:
-  if (data->url && data->rtmpOutCtx) {
-    closeOutput(&data->rtmpOutCtx);
+  if (ctx->url && ctx->rtmpOutCtx) {
+    closeOutput(&ctx->rtmpOutCtx);
   };
 closeCodec:
-  closeCodec(&data->videoEncCtx);
+  closeCodec(&ctx->videoEncCtx);
 
-  if (data->packet) {
-    av_packet_free(&data->packet);
+  if (ctx->packet) {
+    av_packet_free(&ctx->packet);
   }
   return ret;
 }
 
-void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
+int outputWriteAudioPacket(OutputCtxT *output) {
+  AVPacket *pkt, *recPacket, *rtmpPacket, *dashPacket;
+  int ret;
+
+  if (output->url && output->rtmpOutCtx && rtmpOutRunning) {
+    // handle rtmp output if enabled
+    rtmpPacket = av_packet_clone(output->audioEnc->packet);
+
+    av_packet_rescale_ts(rtmpPacket, output->timebase,
+                         output->outVideoRtmp->time_base);
+
+    rtmpPacket->stream_index = 1;
+    ret = av_interleaved_write_frame(output->rtmpOutCtx, rtmpPacket);
+    av_packet_unref(rtmpPacket);
+  }
+
+  if (output->path && output->recCtx) {
+    // handle MPEGTS recording if enabled
+    recPacket = av_packet_clone(output->audioEnc->packet);
+
+    av_packet_rescale_ts(recPacket, output->timebase,
+                         output->outAudioRec->time_base);
+
+    recPacket->stream_index = 1;
+    ret = av_interleaved_write_frame(output->recCtx, recPacket);
+    av_packet_unref(recPacket);
+  }
+
+  // Only the main output will push audio to dash
+  if (output->name && strcmp(output->name, "main") == 0) {
+    dashPacket = av_packet_clone(output->audioEnc->packet);
+    dashPacket->stream_index = output->dashCtx->streamLen;
+
+    av_packet_rescale_ts(dashPacket, output->timebase, output->dashCtx->dashASteam->time_base);
+
+    dashWritePacket(output->dashCtx, dashPacket);
+    av_packet_unref(dashPacket);
+    av_packet_free(&dashPacket);
+  }
+}
+
+void outputWriteVideoFrame(OutputCtxT *data, AVFrame *frame) {
   int ret;
   AVPacket *recPacket, *rtmpPacket, *dashPacket;
 
   if (data->filterEna) {
-    ret = videoFilterPush(&data->vFilter, frame);
+    ret = avFilterPush(&data->vFilter, frame);
     if (ret < 0) {
       av_log(NULL, AV_LOG_ERROR, "output::could not push into filter\n");
       return;
     }
 
-    ret = videoFilterPull(&data->vFilter, &data->encoderFrame);
+    ret = avFilterPull(&data->vFilter, &data->encoderFrame);
     if (ret < 0) {
       if (ret == AVERROR(EAGAIN)) {
         return;
@@ -219,8 +278,7 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
       exit(1);
     }
 
-    av_frame_unref(data->encoderFrame);  // TODO: not sure if that is good
-    // av_frame_free(&data->encoderFrame);  // TODO: not sure if that is good
+    av_frame_unref(data->encoderFrame); // TODO: not sure if that is good
 
   } else {
     ret = avcodec_send_frame(data->videoEncCtx, frame);
@@ -232,6 +290,15 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
 
   while (ret >= 0) {
     ret = avcodec_receive_packet(data->videoEncCtx, data->packet);
+    if (ret == AVERROR(EAGAIN)) {
+      break;
+    }
+
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_DEBUG, "outputWriteVideoFrame::enc packet failed\n");
+      exit(1);
+    }
+
     if (ret == 0) {
       if (data->url && data->rtmpOutCtx && rtmpOutRunning) {
         // handle rtmp output if enabled
@@ -243,7 +310,7 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
         if (ret < 0) {
           // if we have some error on rtmp output restart it
           rtmpOutRunning = 0;
-          ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void*)data);
+          ret = pthread_create(&threadOpenRtmp, NULL, openRtmp, (void *)data);
           if (ret < 0) {
             av_log(NULL, AV_LOG_WARNING,
                    "output::not able to start rtmpOut thread\n");
@@ -275,15 +342,11 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame) {
       av_packet_unref(dashPacket);
       av_packet_free(&dashPacket);
     }
-
     av_packet_unref(data->packet);
-    if (ret < 0) {
-      break;
-    }
   }
 }
 
-void outputClose(OutputCtxT* data) {
+void outputClose(OutputCtxT *data) {
   if (data->path && data->recCtx) {
     closeOutput(&data->recCtx);
   };
@@ -303,17 +366,3 @@ void outputClose(OutputCtxT* data) {
     closeCodec(&data->videoEncCtx);
   }
 }
-
-// TODO:
-//  void outputWriteAudioFrame(OutputCtxT* data, AVFrame* frame) {
-//    av_packet_rescale_ts(data->outRtmpPacket, data->timebase,
-//                         data->outVideoRtmp->time_base);  //
-
-//   ret = av_interleaved_write_frame(data->rtmpOutCtx, data->outRtmpPacket);
-// }
-// if (ret < 0) {
-//   break;
-// }
-// }
-// av_packet_unref(data->outRtmpPacket);
-// }

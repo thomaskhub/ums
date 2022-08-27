@@ -1,5 +1,5 @@
 /**
-* Copyright (C) 2022  Thomas Kinder
+* Copyright (C) 2022  The World
 *
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -23,13 +23,13 @@
 #include <libavfilter/buffersrc.h>
 #include <libavutil/opt.h>
 
-typedef struct VideoFilter {
+typedef struct AvFilter {
   AVFilterGraph *fGraph;
   AVFilterContext *sinkCtx;
   AVFilterContext *srcCtx;
   AVFilterInOut *in;
   AVFilterInOut *out;
-} VideoFilter;
+} AvFilter;
 
 /**
  * @brief initialize a video filter
@@ -46,8 +46,10 @@ typedef struct VideoFilter {
  * @param aspectRatio pixel aspect ratio of vieo frame
  * @return int >= 0 in case of success, a negative AVERROR otherwise
  */
-int initVideoFilter(VideoFilter *ctx, const char *fDesc, int width, int height,
-                    int pixFmt, AVRational timebase, AVRational aspectRatio);
+int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
+                 int pixFmt, AVRational timebase, AVRational aspectRatio,
+                 uint64_t smpFmt, int sampleRate, uint64_t chanLayout,
+                 enum AVMediaType type);
 
 /**
  * @brief push a frame into the video filter
@@ -56,7 +58,7 @@ int initVideoFilter(VideoFilter *ctx, const char *fDesc, int width, int height,
  * @param frame
  * @return int >=0 on success, negaive AVERROR code otherwise
  */
-int videoFilterPush(VideoFilter *ctx, AVFrame *frame);
+int avFilterPush(AvFilter *ctx, AVFrame *frame);
 
 /**
  * @brief pull a video frame from the filter output
@@ -65,12 +67,12 @@ int videoFilterPush(VideoFilter *ctx, AVFrame *frame);
  * @param frame
  * @return int >=0 on success, negaive AVERROR code otherwise
  */
-int videoFilterPull(VideoFilter *ctx, AVFrame **frame);
+int avFilterPull(AvFilter *ctx, AVFrame **frame);
 
 /**
  * @brief Release all resources allocated for the video filter
  *
  * @param ctx
  */
-void videoFilterFree(VideoFilter *ctx);
+void videoFilterFree(AvFilter *ctx);
 #endif

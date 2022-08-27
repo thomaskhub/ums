@@ -1,5 +1,5 @@
 /**
-* Copyright (C) 2022  Thomas Kinder
+* Copyright (C) 2022  The World
 *
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -26,11 +26,8 @@
 #include <string.h>
 #include <time.h>
 
+#include "config.h"
 #include "mux.h"
-
-void initPTS();
-int64_t getPTS();
-int64_t getPTScaled(AVRational timebase);
 
 /**
  * @brief Get the Frame From Image object
@@ -44,7 +41,9 @@ int64_t getPTScaled(AVRational timebase);
 int getFrameFromImage(AVFormatContext **ctx, char *path,
                       AVFrame **pictureFrame);
 
-int getEmptyVideoFrame(AVFrame **frame, int pixFmt, int width, int height);
+int getEmptyAvFrame(AVFrame **frame, int pixFmt, int width, int height,
+                    enum AVSampleFormat smpFmt, int nbSamples,
+                    uint64_t channelLayout, enum AVMediaType type);
 
 /**
  * @brief take a YUV420P video frame and store it into a jpeg
@@ -56,8 +55,38 @@ int getEmptyVideoFrame(AVFrame **frame, int pixFmt, int width, int height);
  */
 int writeFrameToJpeg(AVFrame *frame, char *path);
 
+/**
+ * @brief convert ISO string time to epoch time
+ *
+ * @param isoTimestamp
+ * @return time_t
+ */
 time_t isoTimeToEpoch(char *isoTimestamp);
+
+/**
+ * @brief get the current time as iso formated string
+ *
+ * @param isoTimeString
+ * @return int
+ */
 int getNowAsIso(char **isoTimeString);
-int cleanDir(const char *path);
+
+/**
+ * @brief can be used to clean up dash dir. All
+ * files in dash dir will be removed so be carefull what
+ * directory is passed
+ *
+ * @param path
+ */
+void cleanDashDir(const char *path);
+
+/**
+ * @brief Create a directory if non existing and
+ * we have permission to write to the specified
+ * path.
+ *
+ * @param path
+ * @return int
+ */
 int mkdirP(const char *path);
 #endif

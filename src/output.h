@@ -1,5 +1,5 @@
 /**
-* Copyright (C) 2022  Thomas Kinder
+* Copyright (C) 2022  The World
 *
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -21,6 +21,7 @@
 
 #include <pthread.h>
 
+#include "audioEncoder.h"
 #include "config.h"
 #include "dash.h"
 #include "filters.h"
@@ -28,10 +29,10 @@
 #include "utils.h"
 
 typedef struct {
-  const char* name;
+  const char *name;
   int64_t bitrate;
-  char* url;   // output rtmp url. If NULL nor rtmp output enabled
-  char* path;  // path to recodring file. if null recodring is disabled
+  char *url;  // output rtmp url. If NULL nor rtmp output enabled
+  char *path; // path to recodring file. if null recodring is disabled
   int gop;
   int inWidth;
   int inHeight;
@@ -39,25 +40,30 @@ typedef struct {
   int outHeight;
   int format;
   enum AVMediaType type;
+  int channels;
 
   /**
    * @brief Dash output stream index
    */
   int streamIdx;
+  uint8_t handleDashAudio;
   uint8_t filterEna;
   AVRational timebase;
-  AVFormatContext* rtmpOutCtx;
+  AVFormatContext *rtmpOutCtx;
   AVRational sampleAspectRatio;
-  AVFormatContext* recCtx;
+  AVFormatContext *recCtx;
   AVStream *outVideoRec, *outAudioRec;
-  VideoFilter vFilter;
+  AvFilter vFilter;
   char filterDesc[128];
   AVStream *outVideoRtmp, *outAudioRtmp;
-  AVCodecContext* videoEncCtx;
-  AVCodec* videoEncoder;
-  AVPacket* packet;
-  AVFrame* encoderFrame;
-  DashCtxT* dashCtx;
+  AVCodecContext *videoEncCtx;
+  // AVCodecContext* audioEncCtx;
+  AVCodec *videoEncoder;
+  // AVCodec* audioEncoder;
+  AVPacket *packet;
+  AVFrame *encoderFrame;
+  DashCtxT *dashCtx;
+  AudioEncCtx *audioEnc;
 } OutputCtxT;
 
 /**
@@ -67,15 +73,15 @@ typedef struct {
  *
  * @param frame
  */
-void outputWriteAudioFrame(AVFrame* frame);
-
+void outputWriteAudioFrame(OutputCtxT *data, AVFrame *frame);
+int outputWriteAudioPacket(OutputCtxT *output);
 /**
  * @brief take the input video frame and push it through
  * the encoder and then either into rtmp out, recording out
  * or dash/hls output
  * @param frame
  */
-void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame);
+void outputWriteVideoFrame(OutputCtxT *data, AVFrame *frame);
 
 /**
  * @brief start the output processing
@@ -83,13 +89,13 @@ void outputWriteVideoFrame(OutputCtxT* data, AVFrame* frame);
  * @param data
  * @return int
  */
-int startOutput(OutputCtxT* data);
+int startOutput(OutputCtxT *ctx);
 
 /**
  * @brief clean up all resources allocated for the output
  *
  * @param data
  */
-void outputClose(OutputCtxT* data);
+void outputClose(OutputCtxT *data);
 
 #endif

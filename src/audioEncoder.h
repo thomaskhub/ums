@@ -16,45 +16,44 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
 * USA.
 */
-#ifndef __RTMP_INPUT__
-#define __RTMP_INPUT__
+#ifndef __AUDIO__ENCODER__
+#define __AUDIO__ENCODER__
 
-#include <libavutil/frame.h>
-#include <libavutil/samplefmt.h>
-#include <pthread.h>
+#include <libavcodec/avcodec.h>
 
-#include "avBuffer.h"
 #include "config.h"
-#include "filters.h"
 #include "mux.h"
-#include "utils.h"
-typedef struct {
-  int audioSampleRate;
-  uint64_t audioChannelLayout;
-  int audioChannels;
-  int audioSampleFormat;
-  AVRational audioTimeBase;
-} RtmpInputInfo;
-
-AvBuffer rtmpInVBuffer;
-AvBuffer rtmpInABuffer;
 
 typedef struct {
-  char *url;
-  void (*audioCallback)(AVFrame *frame, AVRational framerate);
-  void (*videoCallback)(AVFrame *frame, AVRational framerate);
-} RtmpWorkerData;
+  /*desired bitrate of the output audio stream*/
+  int64_t bitrate;
 
-void rtmpInputStart(char *url);
-void rtmpInputStop();
-void rtmpInputJoin();
+  /*encoded packet which can be forwarded to muxers*/
+  AVPacket *packet;
+
+  /*frame that contains the data to be encoded*/
+  AVFrame *frame;
+
+  // internal use
+  AVCodecContext *encCtx;
+  AVCodec *encoder;
+  AVRational timebase;
+} AudioEncCtx;
 
 /**
- * @brief function to get the rtmp input status
- * 1 means its running, 0 means its not running
+ * @brief initialize audio encoder
  *
+ * @param ctx
  * @return int
  */
-int rtmpIsRunning();
+int audioEncoderInit(AudioEncCtx *ctx);
+
+/**
+ * @brief convert one audio frame
+ *
+ * @param ctx
+ * @return int
+ */
+int audioEncoderRun(AudioEncCtx *ctx);
 
 #endif

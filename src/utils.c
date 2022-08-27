@@ -2,15 +2,6 @@
 
 int64_t startTime = 0;
 
-void initPTS() { startTime = av_gettime_relative(); }
-
-int64_t getPTS() { return (av_gettime_relative() - startTime); }
-
-int64_t getPTScaled(AVRational timebase) {
-  int64_t curPts = getPTS();
-  return av_rescale(curPts, timebase.den, timebase.num);
-}
-
 int getFrameFromImage(AVFormatContext **ctx, char *path,
                       AVFrame **pictureFrame) {
   int ret;
@@ -34,8 +25,8 @@ int getFrameFromImage(AVFormatContext **ctx, char *path,
     goto closeInput;
   }
 
-  ret = getEmptyVideoFrame(pictureFrame, decCtx->pix_fmt, decCtx->width,
-                           decCtx->height);
+  ret = getEmptyAvFrame(pictureFrame, decCtx->pix_fmt, decCtx->width,
+                        decCtx->height, 0, 0, 0, AVMEDIA_TYPE_VIDEO);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "utils::getFrameFromImage::not able to get empty video frame\n");
@@ -99,7 +90,9 @@ closeInput:
   return ret;
 }
 
-int getEmptyVideoFrame(AVFrame **frame, int pixFmt, int width, int height) {
+int getEmptyAvFrame(AVFrame **frame, int pixFmt, int width, int height,
+                    enum AVSampleFormat smpFmt, int nbSamples,
+                    uint64_t channelLayout, enum AVMediaType type) {
   int ret;
 
   *frame = av_frame_alloc();
@@ -109,9 +102,16 @@ int getEmptyVideoFrame(AVFrame **frame, int pixFmt, int width, int height) {
     return AVERROR(ENOMEM);
   }
 
-  (*frame)->format = pixFmt;
-  (*frame)->width = width;
-  (*frame)->height = height;
+  if (type == AVMEDIA_TYPE_VIDEO) {
+    (*frame)->format = pixFmt;
+    (*frame)->width = width;
+    (*frame)->height = height;
+  } else if (type == AVMEDIA_TYPE_AUDIO) {
+    (*frame)->format = smpFmt;
+    (*frame)->nb_samples = nbSamples;
+    (*frame)->channel_layout = channelLayout;
+    (*frame)->sample_rate = AUDIO_RATE;
+  }
 
   ret = av_frame_get_buffer(*frame, 0);
   if (ret < 0) {
@@ -240,7 +240,6 @@ closeOutput:
   return ret;
 }
 
-// TODO: return an negative error if sscanf failed with wrong format
 time_t isoTimeToEpoch(char *isoTimestamp) {
   // 2021-09-26T16:46:02.642+00:00
   struct tm tstamp = {0};
@@ -292,14 +291,30 @@ int getNowAsIso(char **isoTimeString) {
   return ret;
 }
 
-int cleanDir(const char *path) {
+void cleanDashDir(const char *path) {
+  int ret;
   char cmd[1024];
+  cmd[0] = 0;
+
+  // delete the mpd files
+  strcat(cmd, "exec rm -r ");
+  strcat(cmd, path);
+  strcat(cmd, "/*.mpd > /dev/null");
+  ret = system(cmd);
+
+  // delete the media chunks
   cmd[0] = 0;
   strcat(cmd, "exec rm -r ");
   strcat(cmd, path);
-  strcat(cmd, "/* > /dev/null");
-  printf("%s\n", cmd);
-  return system(cmd);
+  strcat(cmd, "/*.m4s > /dev/null");
+  system(cmd);
+
+  // delete the hls manifest files
+  cmd[0] = 0;
+  strcat(cmd, "exec rm -r ");
+  strcat(cmd, path);
+  strcat(cmd, "/*.m3u8 > /dev/null");
+  system(cmd);
 }
 
 int mkdirP(const char *path) {

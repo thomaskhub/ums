@@ -1,8 +1,9 @@
 #include "dash.h"
 
-static int openDash(DashCtxT* data, AVCodecContext** encoderCtx) {
+static int openDash(DashCtxT *data, AVCodecContext **encoderCtx,
+                    AVCodecContext *aCodecCtx) {
   int ret, i;
-  AVDictionary* opts = NULL;
+  AVDictionary *opts = NULL;
   data->dashOutCtx = NULL;
 
   ret = avformat_alloc_output_context2(&data->dashOutCtx, NULL, "dash",
@@ -15,6 +16,8 @@ static int openDash(DashCtxT* data, AVCodecContext** encoderCtx) {
   for (i = 0; i < data->streamLen; i++) {
     data->dashStreams[i] = avformat_new_stream(data->dashOutCtx, NULL);
   }
+
+  data->dashASteam = avformat_new_stream(data->dashOutCtx, NULL);
 
   // check if all have been setup properly
   for (i = 0; i < data->streamLen; i++) {
@@ -35,9 +38,15 @@ static int openDash(DashCtxT* data, AVCodecContext** encoderCtx) {
     }
   }
 
+  ret = avcodec_parameters_from_context(data->dashASteam->codecpar, aCodecCtx);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR,
+           "openDash::could not setup audio codec params\n");
+    goto closeOutput;
+  }
+
   av_dict_set(&opts, "init_seg_name", "init$RepresentationID$.$ext$", 0);
-  av_dict_set(&opts, "media_seg_name", "$RepresentationID$.$Number%05d$.$ext$",
-              0);
+  av_dict_set(&opts, "media_seg_name", "$RepresentationID$.$Number$.$ext$", 0);
   av_dict_set(&opts, "use_template", "1", 0);
   av_dict_set(&opts, "use_timeline", "1", 0);
   av_dict_set(&opts, "seg_duration", "4", 0);
@@ -47,7 +56,7 @@ static int openDash(DashCtxT* data, AVCodecContext** encoderCtx) {
 
   ret = avformat_write_header(data->dashOutCtx, &opts);
   if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "openRtmp::could not write rtmp out header\n");
+    av_log(NULL, AV_LOG_ERROR, "openDash::write dash header failed\n");
     goto closeOutput;
   }
 
@@ -60,18 +69,19 @@ end:
   return ret;
 }
 
-int startDash(DashCtxT* data, AVCodecContext** encoderCtx) {
+int startDash(DashCtxT *data, AVCodecContext **encoderCtx,
+              AVCodecContext *aCodecCtx) {
   int ret;
   data->dashOutCtx = NULL;
 
-  data->dashStreams = malloc(data->streamLen * sizeof(AVStream*));
+  data->dashStreams = malloc(data->streamLen * sizeof(AVStream *));
   if (!data->dashStreams) {
     av_log(NULL, AV_LOG_ERROR,
            "startDash::not able to allocate stream memory\n");
     return AVERROR(ENOMEM);
   }
 
-  ret = openDash(data, encoderCtx);
+  ret = openDash(data, encoderCtx, aCodecCtx);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "startDash::could not open dash. Ret = %i\n",
            ret);
@@ -79,7 +89,7 @@ int startDash(DashCtxT* data, AVCodecContext** encoderCtx) {
   }
 }
 
-void dashWritePacket(DashCtxT* data, AVPacket* packet) {
+void dashWritePacket(DashCtxT *data, AVPacket *packet) {
   int ret;
   ret = av_interleaved_write_frame(data->dashOutCtx, packet);
   if (ret < 0) {
@@ -87,7 +97,7 @@ void dashWritePacket(DashCtxT* data, AVPacket* packet) {
   }
 }
 
-void dashClose(DashCtxT* data) {
+void dashClose(DashCtxT *data) {
   free(data->dashStreams);
   closeOutput(&data->dashOutCtx);
 }

@@ -64,12 +64,16 @@ int openOutput(AVFormatContext **outFmtCtx, char *filename,
     return AVERROR(ENOMEM);
   }
 
-  if (videoStream) {
-    (*videoStream) = avformat_new_stream((*outFmtCtx), NULL);
-    if (!(*videoStream)) {
-      closeOutput(outFmtCtx);
-      return AVERROR(ENOMEM);
-    }
+  (*videoStream) = avformat_new_stream((*outFmtCtx), NULL);
+  if (!(*videoStream)) {
+    closeOutput(outFmtCtx);
+    return AVERROR(ENOMEM);
+  }
+
+  (*audioStream) = avformat_new_stream((*outFmtCtx), NULL);
+  if (!(*audioStream)) {
+    closeOutput(outFmtCtx);
+    return AVERROR(ENOMEM);
   }
 
   if (!((*outFmtCtx)->flags & AVFMT_NOFILE)) {

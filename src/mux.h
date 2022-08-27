@@ -1,5 +1,5 @@
 /**
-* Copyright (C) 2022  Thomas Kinder
+* Copyright (C) 2022  The World
 *
 * This program is free software; you can redistribute it and/or
 * modify it under the terms of the GNU General Public License
@@ -49,7 +49,25 @@ void closeCodec(AVCodecContext **codec);
  */
 int openDecoder(AVCodecContext **decCtx, AVCodec **decoder, AVStream *stream);
 
+/**
+ * @brief initialize an encoder object
+ *
+ * @param encCtx
+ * @param encoder
+ * @param codecId
+ * @return int
+ */
 int initEncoder(AVCodecContext **encCtx, AVCodec **encoder, int codecId);
+
+/**
+ * @brief open the previously initilaized encoder
+ *
+ * @param encCtx
+ * @param encoder
+ * @param codecpar
+ * @param opt
+ * @return int
+ */
 int openEncoder(AVCodecContext **encCtx, AVCodec **encoder,
                 AVCodecParameters *codecpar, AVDictionary **opt);
 #endif

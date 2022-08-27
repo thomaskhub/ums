@@ -20,6 +20,24 @@
           "text": "-enable-pretty-printing",
           "ignoreFailures": true
         }
+      ],
+      "args": [
+        "-mode",
+        "live",
+        "-rtmpIn",
+        "rtmp://localhost/live/input",
+        "-rtmpOut",
+        "rtmp://localhost/live/output",
+        "-dash",
+        "/tmp/dash/index.mpd",
+        "-rec",
+        "/tmp/testing.ts",
+        "-preFiller",
+        "/home/thomas/Pictures/a.jpg",
+        "-sessionFiller",
+        "/home/thomas/Pictures/a.jpg",
+        "-postFiller",
+        "/home/thomas/Pictures/a.jpg"
       ]
     }
   ]
