@@ -19,10 +19,12 @@
 #ifndef __UTILS__
 #define __UTILS__
 
+#include <dirent.h>
 #include <libavformat/avformat.h>
 #include <libavutil/mathematics.h>
 #include <libavutil/rational.h>
 #include <libavutil/time.h>
+#include <libgen.h>
 #include <string.h>
 #include <time.h>
 
@@ -89,4 +91,13 @@ void cleanDashDir(const char *path);
  * @return int
  */
 int mkdirP(const char *path);
+
+/**
+ * @brief check if a file exists
+ * returns 0 if id does not exist
+ * returns 1 if it exists.
+ * @param path
+ * @return uint8_t
+ */
+uint8_t fileExists(const char *path);
 #endif

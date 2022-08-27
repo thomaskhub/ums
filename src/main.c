@@ -247,6 +247,21 @@ int validateInput() {
       return -1;
     }
 
+    if (!fileExists(preFiller)) {
+      printf("Error: pre filler file not found\n");
+      return -1;
+    }
+
+    if (!fileExists(sessionFiller)) {
+      printf("Error: session filler file not found\n");
+      return -1;
+    }
+
+    if (!fileExists(postFiller)) {
+      printf("Error: post filler file not found\n");
+      return -1;
+    }
+
     if (streamStart == NULL)
       getNowAsIso(&streamStart);
 

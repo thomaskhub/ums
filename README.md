@@ -78,21 +78,30 @@ docker build -t ums .
 docker run --rm -v $(pwd)/lib/ffmpeg:/ffmpeg ums /bin/sh /ffmpeg/compile.sh
 
 #Compile the ums application for production
-docker run --rm -v $(pwd):/source \
-  -e PKG_CONFIG_PATH="./lib/ffmpeg/ffmpeg_build/lib/pkgconfig" \
-  -w /source ums /usr/bin/make
+docker run --rm -it -v $(pwd):/$(pwd) -w $(pwd) \
+  -e PKG_CONFIG_PATH=$(pwd)/lib/ffmpeg/ffmpeg_build/lib/pkgconfig \
+  ums \
+  /usr/bin/make
 
 #Compile the ums application for development
-docker run --rm -v $(pwd):/source -w /source ums /usr/bin/make debug
+docker run --rm -it -v $(pwd):/$(pwd) -w $(pwd) \
+  -e PKG_CONFIG_PATH=$(pwd)/lib/ffmpeg/ffmpeg_build/lib/pkgconfig \
+  ums \
+  /usr/bin/make debug
 
 #Run the ums application in the docker container
 #Application must have been compiled before calling this command
-docker run --rm -v $(pwd):/source -w /source\
- ums ./ums \
+docker run --rm \
+ -v $(pwd):$(pwd) \
+ -v /tmp/dash:/tmp/dash \
+ -v /tmp:/tmp \
+ -w $(pwd) \
+ ums $(pwd)/ums \
+  -mode live \
   -rtmpIn rtmp://localhost/live/input \
   -rtmpOut rtmp://localhost/live/output \
-  -dash ./dash/index.mpd \
-  -rec ./rec/rec.ts \
+  -dash /tmp/dash/index.mpd \
+  -rec /tmp/rec.ts \
   -preFiller ..../english-pre-filler.jpg \
   -sessionFiller ..../english-session-filler.jpg \
   -postFiller ..../english-post-filler.jpg

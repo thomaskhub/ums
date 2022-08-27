@@ -326,3 +326,16 @@ int mkdirP(const char *path) {
   printf("%s\n", cmd);
   return system(cmd);
 }
+
+uint8_t fileExists(const char *path) {
+  char tmpString[2048];
+  DIR *dir;
+  strcpy(tmpString, path);
+  dirname(tmpString);
+  dir = opendir(tmpString);
+  if (!dir) {
+    return 0;
+  }
+  closedir(dir);
+  return 1;
+}

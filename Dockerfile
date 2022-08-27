@@ -26,6 +26,7 @@ RUN apt-get update && apt-get install -y \
     pkg-config \
     texinfo \
     lzma \
+    liblzma-dev \
     wget \
     yasm \
     zlib1g-dev \
