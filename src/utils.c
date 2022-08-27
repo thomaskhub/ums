@@ -326,3 +326,7 @@ int mkdirP(const char *path) {
   printf("%s\n", cmd);
   return system(cmd);
 }
+
+uint8_t fileExists(const char *path) {
+  return access(path, F_OK) == 0 ? 1 : 0;
+}
