@@ -219,6 +219,7 @@ int prepareAudioFiller(AVFrame **frame) {
   }
 
   (*frame)->data[0][0] = 0;
+  return 0;
 }
 
 int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
@@ -257,7 +258,7 @@ int inputSwitchInit(PushVideo _vPush, PushAudio _aPush, RtmpIsActive _checkRtmp,
   ret = prepareAudioFiller(&filler.audioFiller);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
-           "inputSwitch::could not prepare post-session filler\n");
+           "inputSwitch::could not prepare audio filler\n");
     goto freePost;
   }
 
