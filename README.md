@@ -83,7 +83,7 @@ docker run --rm -v $(pwd):$(pwd) \
   -w $(pwd) ums /usr/bin/make
 
 #Compile the ums application for development
-docker run --rm -v $(pwd):$(pwd) -w -w $(pwd) ums /usr/bin/make debug
+docker run --rm -v $(pwd):$(pwd) -w $(pwd) ums /usr/bin/make debug
 
 #Run the ums application in the docker container
 #Application must have been compiled before calling this command
