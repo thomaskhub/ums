@@ -19,8 +19,14 @@
 #ifndef __INPUT_SWITCH__
 #define __INPUT_SWITCH__
 
+#include <libavfilter/avfilter.h>
+#include <libavfilter/buffersink.h>
+#include <libavfilter/buffersrc.h>
+
 #include <libavutil/frame.h>
 #include <libavutil/time.h>
+
+#include <math.h>
 #include <pthread.h>
 
 #include "avBuffer.h"

@@ -53,7 +53,7 @@ typedef struct {
   AVRational sampleAspectRatio;
   AVFormatContext *recCtx;
   AVStream *outVideoRec, *outAudioRec;
-  AvFilter vFilter;
+  UmsAvFilter vFilter;
   char filterDesc[128];
   AVStream *outVideoRtmp, *outAudioRtmp;
   AVCodecContext *videoEncCtx;

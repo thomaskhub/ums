@@ -105,8 +105,15 @@ int startOutput(OutputCtxT *ctx) {
   ctx->inWidth = VIDEO_WIDTH;
   ctx->inHeight = VIDEO_HEIGHT;
   ctx->format = VIDEO_PIX_FMT;
-  ctx->timebase.num = VIDEO_TIMEBASE_NUM;
-  ctx->timebase.den = VIDEO_TIMEBASE_DEN;
+
+  // Orig
+  //  ctx->timebase.num = VIDEO_TIMEBASE_NUM;
+  //  ctx->timebase.den = VIDEO_TIMEBASE_DEN;
+
+  // Timebase new
+  ctx->timebase.num = TIMEBASE_NUM;
+  ctx->timebase.den = TIMEBASE_DEN;
+
   ctx->sampleAspectRatio.den = 1;
   ctx->sampleAspectRatio.num = 1;
 

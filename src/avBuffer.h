@@ -80,4 +80,10 @@ int avBufferPush(AvBuffer *buf, AVFrame *frame);
  */
 uint8_t avBufferFull(AvBuffer *buf);
 
+/**
+ * @brief clear the buffer
+ *
+ */
+void avBufferClear(AvBuffer *buf);
+
 #endif

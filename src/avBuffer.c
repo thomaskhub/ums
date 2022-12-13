@@ -54,6 +54,11 @@ int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
   return 0;
 }
 
+void avBufferClear(AvBuffer *buf) {
+  buf->wrPtr = 0;
+  buf->rdPtr = 0;
+}
+
 uint8_t avBufferFull(AvBuffer *buf) {
   if (!buf->buffer) {
     return 0;

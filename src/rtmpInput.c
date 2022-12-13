@@ -1,16 +1,19 @@
 
 #include "rtmpInput.h"
+#include "types.h"
 
 static pthread_t inputThread;
 static uint32_t runThread = 1;
 static AVCodecContext *audioDecCtx, *videoDecCtx;
 static RtmpWorkerData wData;
 
-static AvFilter vFilter;
-static AvFilter aFilter;
+static UmsAvFilter vFilter;
+static UmsAvFilter aFilter;
 static int firstVideoFrame = 1;
 static int firstAudioFrame = 1;
 volatile static int rtmpRunning = 0;
+
+extern volatile GlobalT global;
 
 void rtmpInputStop() { runThread = 0; }
 void rtmpInputJoin() { pthread_join(inputThread, NULL); }
@@ -22,6 +25,29 @@ RtmpInputInfo rtmpInputInfo() {
   tmp.audioChannels = audioDecCtx->channels;
   tmp.audioSampleFormat = audioDecCtx->sample_fmt;
   tmp.audioTimeBase = audioDecCtx->time_base;
+  return tmp;
+}
+
+AVRational rtmpGetVideoTimebase() {
+  if (videoDecCtx)
+    return videoDecCtx->time_base;
+
+  AVRational tmp = {
+      .den = 1,
+      .num = 1,
+  };
+  return tmp;
+}
+
+AVRational rtmpGetAudioTimebase() {
+  if (videoDecCtx)
+    return audioDecCtx->time_base;
+
+  AVRational tmp = {
+      .den = 1,
+      .num = 1,
+  };
+  return tmp;
 }
 
 void *worker(void *data) {
@@ -34,6 +60,8 @@ void *worker(void *data) {
   AVFrame *videoFrame, *audioFrame;
   AVRational tbase;
   AVFrame *videoOutFrame, *audioOutFrame;
+  AVDictionary *rtmpServerOpts = NULL;
+  AVInputFormat *rtmpFmt;
 
   ret = getEmptyAvFrame(&videoOutFrame, VIDEO_PIX_FMT, VIDEO_WIDTH,
                         VIDEO_HEIGHT, 0, 0, 0, AVMEDIA_TYPE_VIDEO);
@@ -53,20 +81,24 @@ void *worker(void *data) {
   // input stream.
   while (runThread && ret >= 0) {
     printf("rtmp in the loop\n");
+    global.rtmpInputStatus = "stopped";
     rtmpRunning = 0;
-    // avBufferReset(&rtmpInVBuffer);
-    // avBufferReset(&rtmpInABuffer);
-    ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo);
+    avBufferClear(&rtmpInABuffer);
+    avBufferClear(&rtmpInVBuffer);
+
+    ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo, 0, 0);
     if (ret < 0) {
       av_log(NULL, AV_LOG_DEBUG,
              "rtmpInput::Could not open rtmp input %i  url --> %s\n", ret,
              (char *)wData.url);
+
       sleep(3);
       ret = 0; // make sure we restart the loop
       continue;
     }
 
     rtmpRunning = 1;
+    global.rtmpInputStatus = "running";
 
     ret = openDecoder(&audioDecCtx, &audioDecoder, inputAudio);
     if (ret < 0) {
@@ -116,6 +148,7 @@ void *worker(void *data) {
     // Read the input data decode the data which than can be forwarded
     // to processing/encoder
     while (runThread) {
+
       ret = av_read_frame(inFmtCtx, &rtmpPacket);
 
       if (ret < 0) {
@@ -150,10 +183,6 @@ void *worker(void *data) {
                    // reache the start
           }
 
-          // printf("Debug::Audio:: %li  %li %li %li %li\n", audioFrame->pts,
-          //        inputAudio->time_base.num, inputAudio->time_base.den,
-          //        av_frame_get_pkt_pos(audioFrame), inputVideo->start_time);
-
           if (ret == AVERROR(EAGAIN)) {
             continue;
           }
@@ -165,6 +194,7 @@ void *worker(void *data) {
                                inputAudio->time_base, noSampleAspect,
                                audioFrame->format, audioFrame->sample_rate,
                                audioFrame->channel_layout, AVMEDIA_TYPE_AUDIO);
+
             if (ret < 0) {
               av_log(NULL, AV_LOG_ERROR,
                      "rtmpInput::could not init video filter\n");

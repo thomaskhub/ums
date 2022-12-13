@@ -15,7 +15,11 @@
     "string": "c",
     "string_view": "c",
     "cmath": "c",
-    "libgen.h": "c"
+    "libgen.h": "c",
+    "rtmppkt.h": "c",
+    "iostream": "c",
+    "streambuf": "c",
+    "chrono": "c"
   },
   "makefile.launchConfigurations": [
     {

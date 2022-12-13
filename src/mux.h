@@ -26,8 +26,8 @@
 #include <libavutil/time.h>
 #include <unistd.h>
 
-int openInput(AVFormatContext **inFmtCtx, char *filename,
-              AVStream **audioStream, AVStream **videoStream);
+int openInput(AVFormatContext **inFmtCtx, char *filename, AVStream **audioStream,
+              AVStream **videoStream, AVInputFormat *fmt, AVDictionary **opts);
 
 void closeInput(AVFormatContext **inFmtCtx);
 

@@ -1,6 +1,6 @@
 #include "filters.h"
 
-int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
+int initAvFilter(UmsAvFilter *ctx, const char *fDesc, int width, int height,
                  int pixFmt, AVRational timebase, AVRational aspectRatio,
                  uint64_t smpFmt, int sampleRate, uint64_t chanLayout,
                  enum AVMediaType type) {
@@ -113,7 +113,7 @@ freeInput:
   return ret;
 }
 
-void videoFilterFree(AvFilter *ctx) {
+void videoFilterFree(UmsAvFilter *ctx) {
   if (ctx->fGraph) {
     avfilter_graph_free(&ctx->fGraph);
     avfilter_inout_free(&ctx->out);
@@ -121,7 +121,7 @@ void videoFilterFree(AvFilter *ctx) {
   }
 }
 
-int avFilterPush(AvFilter *ctx, AVFrame *frame) {
+int avFilterPush(UmsAvFilter *ctx, AVFrame *frame) {
   int ret;
 
   ret = av_buffersrc_add_frame_flags(ctx->srcCtx, frame,
@@ -134,7 +134,7 @@ int avFilterPush(AvFilter *ctx, AVFrame *frame) {
   return 0;
 }
 
-int avFilterPull(AvFilter *ctx, AVFrame **frame) {
+int avFilterPull(UmsAvFilter *ctx, AVFrame **frame) {
   int ret;
   ret = av_buffersink_get_frame(ctx->sinkCtx, *frame);
   return ret;
