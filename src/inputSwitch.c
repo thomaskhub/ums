@@ -122,6 +122,7 @@ uint64_t handleVideoFrames(int64_t *nextVideoPTS) {
       frame->pkt_dts = *nextVideoPTS;
       frame->best_effort_timestamp = *nextVideoPTS;
       frame->pkt_duration = VFRAME_DURATION;
+      frame->pict_type = global.inputSwitchVFrameCnt % 100 == 0 ? AV_PICTURE_TYPE_I : 0; // This is needed to play the video properly in chrome, somthink like this ffmpeg is also doing...
       vPush(frame);
       *nextVideoPTS += VFRAME_DURATION;
       global.inputSwitchVFrameCnt++;
@@ -151,37 +152,6 @@ uint64_t handleAudioFrames(int64_t *nextAudioPTS) {
       global.inputSwitchAFrameCnt += AUDIO_NB_SAMPLES;
     }
   }
-}
-
-void handleMediaStats(uint64_t videoFrameCnt, uint64_t audioFrameCnt) {
-
-  //  int64_t loopDurationAvgData[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  // double loopDurationAvg;
-
-  // double framrateAvgData[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  // double fpsAvg;
-
-  // double sampleRateAvgData[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  // double sampleRateAvg;
-
-  //  videoFpsDur = av_gettime_relative() - videoFpsStart;
-  // if (videoFpsDur >= 1000000) {
-  //   fpsAvg = movingAverageDouble((double *)framrateAvgData, 1, (double)vFcnt * 1000000 / (double)videoFpsDur);
-  //   sampleRateAvg = movingAverageDouble((double *)sampleRateAvgData, 1, (double)aFcnt * 1000000 / (double)videoFpsDur);
-
-  //   // printf("##### --> Video Rate=%f\n",
-  //   //        (double)vFcnt * 1000000 / (double)videoFpsDur);
-
-  //   printf("##### --> Video Rate=%f\n", fpsAvg);
-  //   printf("##### --> Audio Rate=%f\n", sampleRateAvg);
-
-  //   // printf("##### --> Audio Rate=%f\n",
-  //   //        (double)aFcnt * 1000000 / (double)videoFpsDur);
-  //   videoFpsStart = av_gettime_relative();
-  //   printf("### runtime --> %lu\n", (av_gettime_relative() - procStart) / 1000000);
-  //   vFcnt = 0;
-  //   aFcnt = 0;
-  // }
 }
 
 void *_worker(void *args) {

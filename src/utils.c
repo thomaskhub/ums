@@ -11,7 +11,7 @@ int getFrameFromImage(AVFormatContext **ctx, char *path,
   AVPacket *pkt;
   struct SwsContext *swsCtx;
 
-  ret = openInput(ctx, path, &audioStream, &videoStream);
+  ret = openInput(ctx, path, &audioStream, &videoStream, 0, 0);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "utils::getFrameFromImage::could not open file\n");
@@ -329,4 +329,44 @@ int mkdirP(const char *path) {
 
 uint8_t fileExists(const char *path) {
   return access(path, F_OK) == 0 ? 1 : 0;
+}
+
+double movingAverage(int64_t *data, uint8_t periods, int64_t value) {
+  int i;
+  int64_t sum = 0;
+  for (i = periods - 1; i > 0; i--) {
+    data[i] = data[i - 1];
+    sum += data[i];
+  }
+  data[0] = value;
+  sum += data[0];
+
+  return sum / periods;
+}
+
+double movingAverageDouble(double *data, uint8_t periods, double value) {
+  int i;
+  int64_t sum = 0;
+  for (i = periods - 1; i > 0; i--) {
+    data[i] = data[i - 1];
+    sum += data[i];
+  }
+  data[0] = value;
+  sum += data[0];
+
+  return sum / periods;
+}
+
+void rescaleVideoFrame(AVFrame *frame) {
+  // int64_t tmp = av_rescale(frame->pts, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
+  // printf("New fps --> %lu | %lu \n", frame->pts, tmp);
+  frame->pts = av_rescale(frame->pts, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
+  frame->pkt_dts = av_rescale(frame->pkt_dts, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
+  frame->pkt_duration = av_rescale(frame->pkt_duration, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
+}
+
+void rescaleAudioFrame(AVFrame *frame) {
+  frame->pts = av_rescale(frame->pts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+  frame->pkt_dts = av_rescale(frame->pkt_dts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+  frame->pkt_duration = av_rescale(frame->pkt_duration, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
 }

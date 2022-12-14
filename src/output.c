@@ -100,6 +100,8 @@ end:
 
 int startOutput(OutputCtxT *ctx) {
   int ret;
+  AVRational framerate;
+  char x264params[1024];
 
   ctx->gop = 100;
   ctx->inWidth = VIDEO_WIDTH;
@@ -126,25 +128,44 @@ int startOutput(OutputCtxT *ctx) {
     return ret;
   }
 
+  // printf("bitrate --> %lu %lu\n", ctx->bitrate, ctx->videoEncCtx->bit_rate);
+  framerate.den = VIDEO_FRAME_RATE;
+  framerate.num = 1;
+
   ctx->videoEncCtx->height = ctx->outHeight;
   ctx->videoEncCtx->width = ctx->outWidth;
   ctx->videoEncCtx->sample_aspect_ratio = ctx->sampleAspectRatio;
   ctx->videoEncCtx->pix_fmt = ctx->format;
   ctx->videoEncCtx->time_base = ctx->timebase;
+  ctx->videoEncCtx->framerate = framerate;
   ctx->videoEncCtx->bit_rate = ctx->bitrate;
-  ctx->videoEncCtx->keyint_min = ctx->gop;
+  ctx->videoEncCtx->keyint_min = ctx->gop / 10;
   ctx->videoEncCtx->gop_size = ctx->gop;
-  ctx->videoEncCtx->rc_buffer_size = ctx->videoEncCtx->bit_rate;
-  ctx->videoEncCtx->rc_max_rate = ctx->videoEncCtx->bit_rate;
+  ctx->videoEncCtx->rc_buffer_size = ctx->bitrate;
+  ctx->videoEncCtx->rc_max_rate = ctx->bitrate;
   ctx->videoEncCtx->colorspace = AVCOL_SPC_BT709;
   ctx->videoEncCtx->color_trc = AVCOL_TRC_BT709;
   ctx->videoEncCtx->color_primaries = AVCOL_PRI_BT709;
+
   ctx->videoEncCtx->flags = AV_CODEC_FLAG_GLOBAL_HEADER;
+
+  // Leave this as reference for future if needed
+  //  sprintf(x264params, "vbv_maxrate=%u:vbv_bufsize=%u:bitrate=%u:fps=%u:keyint=%u:keyint_min=%u:scenecut=0",
+  //          ctx->bitrate / 1000,
+  //          ctx->bitrate / 1000,
+  //          ctx->bitrate / 1000,
+  //          VIDEO_FRAME_RATE,
+  //          ctx->gop,
+  //          ctx->gop);
 
   av_opt_set(ctx->videoEncCtx->priv_data, "level", "3.1", 0);
   av_opt_set(ctx->videoEncCtx->priv_data, "preset", "veryfast", 0);
-  av_opt_set(ctx->videoEncCtx->priv_data, "tune", "stillimage", 0);
+
   av_opt_set(ctx->videoEncCtx->priv_data, "profile", "high", 0);
+  av_opt_set_int(ctx->videoEncCtx->priv_data, "sc_threshold", 0, 0);
+  av_opt_set_int(ctx->videoEncCtx->priv_data, "forced-idr", 1, 0);
+
+  // av_opt_set(ctx->videoEncCtx->priv_data, "x264-params", x264params, 0);
 
   ret = avcodec_open2(ctx->videoEncCtx, ctx->videoEncoder, NULL);
   if (ret < 0) {

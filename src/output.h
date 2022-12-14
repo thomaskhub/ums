@@ -30,7 +30,7 @@
 
 typedef struct {
   const char *name;
-  int64_t bitrate;
+  int32_t bitrate;
   char *url;  // output rtmp url. If NULL nor rtmp output enabled
   char *path; // path to recodring file. if null recodring is disabled
   int gop;

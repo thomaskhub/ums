@@ -100,4 +100,15 @@ int mkdirP(const char *path);
  * @return uint8_t
  */
 uint8_t fileExists(const char *path);
+
+/**
+ * @brief Calculate the moving average
+ *
+ * @param data
+ * @param periods
+ * @return int64_t
+ */
+double movingAverage(int64_t *data, uint8_t periods, int64_t value);
+double movingAverageDouble(double *data, uint8_t periods, double value);
+void rescaleVideoFrame(AVFrame *frame);
 #endif

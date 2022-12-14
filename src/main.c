@@ -43,6 +43,9 @@
 #define OPT_SESSION_START 9
 #define OPT_SESSION_END 10
 
+volatile GlobalT global;
+pthread_t inputSwitchThread;
+
 static struct option longOptions[] = {
     {"mode", required_argument, 0, OPT_MODE},
     {"rtmpIn", required_argument, 0, OPT_RTMP_IN},
@@ -77,30 +80,30 @@ OutputCtxT vOutCfg[] = {
      .outWidth = VIDEO_WIDTH,
      .outHeight = VIDEO_HEIGHT,
      .type = AVMEDIA_TYPE_VIDEO},
-    {.bitrate = 1440000,
-     .outWidth = 960,
-     .outHeight = 540,
-     .type = AVMEDIA_TYPE_VIDEO},
-    {.bitrate = 720000,
-     .outWidth = 960,
-     .outHeight = 540,
-     .type = AVMEDIA_TYPE_VIDEO},
-    {.bitrate = 540000,
-     .outWidth = 640,
-     .outHeight = 360,
-     .type = AVMEDIA_TYPE_VIDEO},
-    {.bitrate = 280000,
-     .outWidth = 512,
-     .outHeight = 288,
-     .type = AVMEDIA_TYPE_VIDEO},
-    {.bitrate = 140000,
-     .outWidth = 384,
-     .outHeight = 216,
-     .type = AVMEDIA_TYPE_VIDEO},
-    {.bitrate = 140000,
-     .outWidth = 256,
-     .outHeight = 144,
-     .type = AVMEDIA_TYPE_VIDEO},
+    // {.bitrate = 1440000,
+    //  .outWidth = 960,
+    //  .outHeight = 540,
+    //  .type = AVMEDIA_TYPE_VIDEO},
+    // {.bitrate = 720000,
+    //  .outWidth = 960,
+    //  .outHeight = 540,
+    //  .type = AVMEDIA_TYPE_VIDEO},
+    // {.bitrate = 540000,
+    //  .outWidth = 640,
+    //  .outHeight = 360,
+    //  .type = AVMEDIA_TYPE_VIDEO},
+    // {.bitrate = 280000,
+    //  .outWidth = 512,
+    //  .outHeight = 288,
+    //  .type = AVMEDIA_TYPE_VIDEO},
+    // {.bitrate = 140000,
+    //  .outWidth = 384,
+    //  .outHeight = 216,
+    //  .type = AVMEDIA_TYPE_VIDEO},
+    // {.bitrate = 140000,
+    //  .outWidth = 256,
+    //  .outHeight = 144,
+    //  .type = AVMEDIA_TYPE_VIDEO},
 };
 
 AudioEncCtx aOutCfg = {.bitrate = 64000};
@@ -129,6 +132,24 @@ void showHelp() {
   printf("\t--sessionEnd ISO_TIMESTAMP   : session end ISO formated string\n");
 }
 
+// TODO: remove this and replace this with MQTT thread
+void *_statsWorker(void *args) {
+  double inputSwitchDuration = 0;
+  double inputSwitchFps = 0;
+  double inputSwitchSR = 0;
+  while (1) {
+    av_usleep(10000000); // approx 1s interval
+
+    inputSwitchDuration = (av_gettime_relative() - global.inputSwitchStartTime) / 1000000.0;
+    inputSwitchFps = (double)global.inputSwitchVFrameCnt / inputSwitchDuration;
+    inputSwitchSR = (double)global.inputSwitchAFrameCnt / inputSwitchDuration;
+
+    printf("inputSwitch:: Video FPS = %f, Audio Sample Rate = %f\n", inputSwitchFps, inputSwitchSR);
+    printf("main::runtime = %f\n", (av_gettime_relative() - global.mainStartTime) / 1000000.0);
+    printf("rtmpInput::status = %s\n", global.rtmpInputStatus);
+  }
+}
+
 /**
  * @brief write frame to output modules
  * this callback is triggered when the input module has a new audio frame
@@ -152,7 +173,7 @@ void switchPushAFrame(AVFrame *frame) {
     return;
   }
 
-  aOutCfg.packet->duration = frame->pkt_duration,
+  // aOutCfg.packet->duration = frame->pkt_duration,
 
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
   for (i = 0; i < cfgLength; i++) {
@@ -183,13 +204,16 @@ void switchPushVFrame(AVFrame *frame) {
  */
 void signalCloseHandler(int signum) {
   int i;
-  printf("Signal recieved %i\n", signum);
+  printf("Signal receive %i\n", signum);
   inputSwitchClose();
   dashClose(&dashCtx);
 
   for (i = 0; i < cfgLength; i++) {
     outputClose(&vOutCfg[i]);
   }
+
+  // TODO: remove this once mqtt process is in place
+  pthread_kill(inputSwitchThread, SIGKILL);
 
   rtmpInputStop();
   rtmpInputJoin(); // wait for rtmp input thread to be terminated
@@ -293,7 +317,7 @@ int validateInput() {
     dir = opendir(tmpString);
     if (!dir) {
       closedir(dir);
-      printf("Error: dash output directory cannot be opened\n");
+      printf("Error: dash output directory cannot be opened %s\n", tmpString);
       return -1;
     }
     closedir(dir);
@@ -326,6 +350,8 @@ int validateInput() {
 int main(int argc, char **argv) {
   int ret, i, c, optionIndex;
   char *dashDirName;
+
+  // av_log_set_level(AV_LOG_DEBUG);
 
   // if no parameters are being passes show the help
   if (argc < 2) {
@@ -419,6 +445,12 @@ int main(int argc, char **argv) {
     exit(1);
   }
 
+  // Start a thread to print stream stats, this should be replaced with MQTT
+
+  pthread_create(&inputSwitchThread, NULL, _statsWorker, NULL);
+
+  //----
+
   rtmpInputStart(rtmpInUrl);
 
   ret = audioEncoderInit(&aOutCfg);
@@ -426,6 +458,8 @@ int main(int argc, char **argv) {
     av_log(NULL, AV_LOG_ERROR, "main::audio encoder init failed\n");
     exit(1);
   }
+
+  global.mainStartTime = av_gettime_relative();
 
   for (i = 0; i < cfgLength; i++) {
     av_log(NULL, AV_LOG_DEBUG, "Going to setup output = %s\n", vOutCfg[i].name);
