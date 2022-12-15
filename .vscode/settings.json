@@ -19,7 +19,10 @@
     "rtmppkt.h": "c",
     "iostream": "c",
     "streambuf": "c",
-    "chrono": "c"
+    "chrono": "c",
+    "audioencoder.h": "c",
+    "avcodec.h": "c",
+    "codec.h": "c"
   },
   "makefile.launchConfigurations": [
     {

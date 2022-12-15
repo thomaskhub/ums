@@ -128,6 +128,7 @@ int writeFrameToJpeg(AVFrame *frame, char *path) {
   AVCodec *encoder;
   AVStream *videoStream;
   AVPacket *pkt;
+  const char *shortName = "mjpeg";
 
   int ret = 0;
   ret = openOutput(&outFmt, path, NULL, &videoStream, "mjpeg");
@@ -137,7 +138,7 @@ int writeFrameToJpeg(AVFrame *frame, char *path) {
     return ret;
   }
 
-  encoder = avcodec_find_encoder_by_name("mjpeg");
+  encoder = avcodec_find_encoder_by_name(shortName);
   if (!encoder) {
     av_log(NULL, AV_LOG_ERROR,
            "utils::writeFrameToFile::not able to find encoder\n");
@@ -323,7 +324,6 @@ int mkdirP(const char *path) {
   strcat(cmd, "exec mkdir -p ");
   strcat(cmd, path);
   strcat(cmd, " > /dev/null");
-  printf("%s\n", cmd);
   return system(cmd);
 }
 
@@ -369,4 +369,15 @@ void rescaleAudioFrame(AVFrame *frame) {
   frame->pts = av_rescale(frame->pts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
   frame->pkt_dts = av_rescale(frame->pkt_dts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
   frame->pkt_duration = av_rescale(frame->pkt_duration, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+}
+
+void setAudioDelay(AVFilterGraph *graph, uint32_t delay) {
+  char args[128];
+  int ret;
+
+  sprintf(args, "%i|%i", delay, delay);
+  ret = avfilter_graph_send_command(graph, "adelay", "delays", args, 0, 0, 0);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "utils::setAudioDelay:: could not set dealay (%i)", ret);
+  }
 }

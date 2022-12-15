@@ -111,4 +111,13 @@ uint8_t fileExists(const char *path);
 double movingAverage(int64_t *data, uint8_t periods, int64_t value);
 double movingAverageDouble(double *data, uint8_t periods, double value);
 void rescaleVideoFrame(AVFrame *frame);
+
+/**
+ * @brief Set the Audio Delay in the filter for AV sync if needed
+ *
+ * @param graph
+ * @param delay
+ */
+void setAudioDelay(AVFilterGraph *graph, uint32_t delay);
+
 #endif

@@ -43,8 +43,7 @@
 
 #define FILLER_VIDEO_FILTER "scale=1280:720,format=yuv420p"
 #define RTMPIN_VIDEO_FILTER "scale=1280:720,format=yuv420p,fps=fps=25"
-// #define RTMPIN_AUDIO_FILTER "aresample=44100,volume=1,aformat=channel_layouts=mono:sample_rates=44100"
-#define RTMPIN_AUDIO_FILTER "adelay@delay=delays=0,aresample=44100,aformat=channel_layouts=mono,volume=1"
+#define RTMPIN_AUDIO_FILTER "adelay@adelay=delays=0,aresample=44100,aformat=channel_layouts=mono,volume=1"
 
 #define TIMEBASE_NUM 1
 #define TIMEBASE_DEN 1000000
@@ -58,6 +57,7 @@
  */
 typedef struct {
   UmsAvFilter *audioFilter;
+  UmsAvFilter *videoFilter;
   const char *test;
   uint64_t inputSwitchVFrameCnt;
   uint64_t inputSwitchAFrameCnt;

@@ -1,6 +1,5 @@
 
 #include "rtmpInput.h"
-#include "types.h"
 
 static pthread_t inputThread;
 static uint32_t runThread = 1;
@@ -80,7 +79,6 @@ void *worker(void *data) {
   // this while loop is there to automatically reconnect to failing rtmp
   // input stream.
   while (runThread && ret >= 0) {
-    printf("rtmp in the loop\n");
     global.rtmpInputStatus = "stopped";
     rtmpRunning = 0;
     avBufferClear(&rtmpInABuffer);
@@ -102,20 +100,20 @@ void *worker(void *data) {
 
     ret = openDecoder(&audioDecCtx, &audioDecoder, inputAudio);
     if (ret < 0) {
-      printf("Could not open audio decoder....\n");
+      av_log(NULL, AV_LOG_ERROR, "Could not open audio decoder....\n");
       goto freeAll;
     }
 
     ret = openDecoder(&videoDecCtx, &videoDecoder, inputVideo);
     if (ret < 0) {
-      printf("Could not open vidoe decoder....\n");
+      av_log(NULL, AV_LOG_ERROR, "Could not open vidoe decoder....\n");
       goto freeAll;
     }
     tmp = videoDecCtx;
 
     audioFrame = av_frame_alloc();
     if (!audioFrame) {
-      printf("could not alloc audio frame\n");
+      av_log(NULL, AV_LOG_ERROR, "could not alloc audio frame\n");
       goto freeAll;
     }
 
@@ -125,13 +123,13 @@ void *worker(void *data) {
 
     ret = av_frame_get_buffer(audioFrame, 0);
     if (ret < 0) {
-      printf("could not get audio frame\n");
+      av_log(NULL, AV_LOG_ERROR, "could not get audio frame\n");
       goto freeAll;
     }
 
     videoFrame = av_frame_alloc();
     if (!videoFrame) {
-      printf("not able to allocate video frame\n");
+      av_log(NULL, AV_LOG_ERROR, "not able to allocate video frame\n");
       goto freeAll;
     }
 
@@ -141,7 +139,7 @@ void *worker(void *data) {
 
     ret = av_frame_get_buffer(videoFrame, 0);
     if (ret < 0) {
-      printf("not able get buffer for video frame\n");
+      av_log(NULL, AV_LOG_ERROR, "not able get buffer for video frame\n");
       goto freeAll;
     }
 
@@ -152,7 +150,7 @@ void *worker(void *data) {
       ret = av_read_frame(inFmtCtx, &rtmpPacket);
 
       if (ret < 0) {
-        printf("Could not rad any packet from rtmp...\n");
+        av_log(NULL, AV_LOG_ERROR, "Could not rad any packet from rtmp...\n");
         break;
       }
 
@@ -163,7 +161,7 @@ void *worker(void *data) {
 
         ret = avcodec_send_packet(audioDecCtx, &rtmpPacket);
         if (ret < 0) {
-          printf("Could not send packet to audio decoder....\n");
+          av_log(NULL, AV_LOG_ERROR, "Could not send packet to audio decoder....\n");
           continue;
           break;
         }
@@ -200,6 +198,8 @@ void *worker(void *data) {
                      "rtmpInput::could not init video filter\n");
               goto freeAll;
             }
+
+            global.audioFilter = &aFilter;
           }
 
           ret = avFilterPush(&aFilter, audioFrame);
@@ -238,7 +238,7 @@ void *worker(void *data) {
 
         ret = avcodec_send_packet(videoDecCtx, &rtmpPacket);
         if (ret < 0) {
-          printf("Could not send packet to video decoder....\n");
+          av_log(NULL, AV_LOG_ERROR, "Could not send packet to video decoder....\n");
           break;
         }
 
@@ -273,6 +273,8 @@ void *worker(void *data) {
                        "rtmpInput::could not init video filter\n");
                 goto freeAll;
               }
+
+              global.videoFilter = &vFilter;
             }
 
             ret = avFilterPush(&vFilter, videoFrame);
@@ -344,7 +346,7 @@ void *worker(void *data) {
 
     ret = 0; // make sure we restart the loop
   }
-  printf("rtmp out of the loop\n");
+
   // Free all resource if rtmp input is stopepd which should never happen but
   // just in case
   av_frame_free(&videoFrame);
@@ -353,8 +355,6 @@ void *worker(void *data) {
   closeCodec(&audioDecCtx);
   closeCodec(&videoDecCtx);
   closeInput(&inFmtCtx);
-  // avBufferClose(&rtmpInVBuffer); //TODO: enable this again
-  printf("Input loop stoppped...\n");
 }
 
 void rtmpInputStart(char *url) {

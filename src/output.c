@@ -124,11 +124,10 @@ int startOutput(OutputCtxT *ctx) {
 
   ret = initEncoder(&ctx->videoEncCtx, &ctx->videoEncoder, AV_CODEC_ID_H264);
   if (ret < 0) {
-    printf("Could not init video encoder ...\n");
+    av_log(NULL, AV_LOG_ERROR, "Could not init video encoder ...\n");
     return ret;
   }
 
-  // printf("bitrate --> %lu %lu\n", ctx->bitrate, ctx->videoEncCtx->bit_rate);
   framerate.den = VIDEO_FRAME_RATE;
   framerate.num = 1;
 
@@ -380,7 +379,6 @@ void outputClose(OutputCtxT *data) {
   };
 
   outputStopRtmp();
-  outputRtmpJoin();
 
   if (data->filterEna) {
     videoFilterFree(&data->vFilter);
