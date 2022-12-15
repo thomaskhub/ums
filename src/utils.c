@@ -11,7 +11,7 @@ int getFrameFromImage(AVFormatContext **ctx, char *path,
   AVPacket *pkt;
   struct SwsContext *swsCtx;
 
-  ret = openInput(ctx, path, &audioStream, &videoStream);
+  ret = openInput(ctx, path, &audioStream, &videoStream, 0, 0);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "utils::getFrameFromImage::could not open file\n");
@@ -128,6 +128,7 @@ int writeFrameToJpeg(AVFrame *frame, char *path) {
   AVCodec *encoder;
   AVStream *videoStream;
   AVPacket *pkt;
+  const char *shortName = "mjpeg";
 
   int ret = 0;
   ret = openOutput(&outFmt, path, NULL, &videoStream, "mjpeg");
@@ -137,7 +138,7 @@ int writeFrameToJpeg(AVFrame *frame, char *path) {
     return ret;
   }
 
-  encoder = avcodec_find_encoder_by_name("mjpeg");
+  encoder = avcodec_find_encoder_by_name(shortName);
   if (!encoder) {
     av_log(NULL, AV_LOG_ERROR,
            "utils::writeFrameToFile::not able to find encoder\n");
@@ -323,10 +324,60 @@ int mkdirP(const char *path) {
   strcat(cmd, "exec mkdir -p ");
   strcat(cmd, path);
   strcat(cmd, " > /dev/null");
-  printf("%s\n", cmd);
   return system(cmd);
 }
 
 uint8_t fileExists(const char *path) {
   return access(path, F_OK) == 0 ? 1 : 0;
+}
+
+double movingAverage(int64_t *data, uint8_t periods, int64_t value) {
+  int i;
+  int64_t sum = 0;
+  for (i = periods - 1; i > 0; i--) {
+    data[i] = data[i - 1];
+    sum += data[i];
+  }
+  data[0] = value;
+  sum += data[0];
+
+  return sum / periods;
+}
+
+double movingAverageDouble(double *data, uint8_t periods, double value) {
+  int i;
+  int64_t sum = 0;
+  for (i = periods - 1; i > 0; i--) {
+    data[i] = data[i - 1];
+    sum += data[i];
+  }
+  data[0] = value;
+  sum += data[0];
+
+  return sum / periods;
+}
+
+void rescaleVideoFrame(AVFrame *frame) {
+  // int64_t tmp = av_rescale(frame->pts, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
+  // printf("New fps --> %lu | %lu \n", frame->pts, tmp);
+  frame->pts = av_rescale(frame->pts, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
+  frame->pkt_dts = av_rescale(frame->pkt_dts, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
+  frame->pkt_duration = av_rescale(frame->pkt_duration, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
+}
+
+void rescaleAudioFrame(AVFrame *frame) {
+  frame->pts = av_rescale(frame->pts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+  frame->pkt_dts = av_rescale(frame->pkt_dts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+  frame->pkt_duration = av_rescale(frame->pkt_duration, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+}
+
+void setAudioDelay(AVFilterGraph *graph, uint32_t delay) {
+  char args[128];
+  int ret;
+
+  sprintf(args, "%i|%i", delay, delay);
+  ret = avfilter_graph_send_command(graph, "adelay", "delays", args, 0, 0, 0);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "utils::setAudioDelay:: could not set dealay (%i)", ret);
+  }
 }

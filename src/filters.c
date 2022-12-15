@@ -1,6 +1,6 @@
 #include "filters.h"
 
-int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
+int initAvFilter(UmsAvFilter *ctx, const char *fDesc, int width, int height,
                  int pixFmt, AVRational timebase, AVRational aspectRatio,
                  uint64_t smpFmt, int sampleRate, uint64_t chanLayout,
                  enum AVMediaType type) {
@@ -20,32 +20,32 @@ int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
 
   buffSrc = avfilter_get_by_name(inbufStr);
   if (!buffSrc) {
-    printf("Error::initAvFilter::could not get buffer\n");
+    av_log(NULL, AV_LOG_ERROR, "Error::initAvFilter::could not get buffer\n");
     return AVERROR(ENODEV);
   }
 
   buffSink = avfilter_get_by_name(outbufStr);
   if (!buffSink) {
-    printf("Error::initAvFilter::could not get buffer\n");
+    av_log(NULL, AV_LOG_ERROR, "Error::initAvFilter::could not get buffer\n");
     return AVERROR(ENODEV);
   }
 
   ctx->in = avfilter_inout_alloc();
   if (!ctx->in) {
-    printf("Error::initAvFilter::could not allocate inputs\n");
+    av_log(NULL, AV_LOG_ERROR, "Error::initAvFilter::could not allocate inputs\n");
     return AVERROR(ENOMEM);
   }
 
   ctx->out = avfilter_inout_alloc();
   if (!ctx->out) {
-    printf("Error::initAvFilter::could not allocate outputs\n");
+    av_log(NULL, AV_LOG_ERROR, "Error::initAvFilter::could not allocate outputs\n");
     ret = AVERROR(ENOMEM);
     goto freeInput;
   }
 
   ctx->fGraph = avfilter_graph_alloc();
   if (!ctx->fGraph) {
-    printf("Error::initAvFilter::could not allocate filter graph\n");
+    av_log(NULL, AV_LOG_ERROR, "Error::initAvFilter::could not allocate filter graph\n");
     ret = AVERROR(ENOMEM);
     goto freeOutput;
   }
@@ -65,7 +65,7 @@ int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
                                      ctx->fGraph);
 
   if (ret < 0) {
-    printf("Error::initAvFilter::could not create source buffer\n");
+    av_log(NULL, AV_LOG_ERROR, "Error::initAvFilter::could not create source buffer\n");
     ret = AVERROR(ENOMEM);
     goto freeFilterGraph;
   }
@@ -74,7 +74,7 @@ int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
                                      ctx->fGraph);
 
   if (ret < 0) {
-    printf("Error::initAvFilter::could not create sink buffer\n");
+    av_log(NULL, AV_LOG_ERROR, "Error::initAvFilter::could not create sink buffer\n");
     ret = AVERROR(ENOMEM);
     goto freeFilterGraph;
   }
@@ -91,13 +91,13 @@ int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
 
   ret = avfilter_graph_parse_ptr(ctx->fGraph, fDesc, &ctx->in, &ctx->out, NULL);
   if (ret < 0) {
-    printf("Error::initAvFilter::could not parse filter graph\n");
+    av_log(NULL, AV_LOG_ERROR, "Error::initAvFilter::could not parse filter graph\n");
     goto freeFilterGraph;
   }
 
   ret = avfilter_graph_config(ctx->fGraph, NULL);
   if (ret < 0) {
-    printf("Error::initAvFilter::could not configure graph\n");
+    av_log(NULL, AV_LOG_ERROR, "Error::initAvFilter::could not configure graph\n");
     goto freeFilterGraph;
   }
 
@@ -113,7 +113,7 @@ freeInput:
   return ret;
 }
 
-void videoFilterFree(AvFilter *ctx) {
+void videoFilterFree(UmsAvFilter *ctx) {
   if (ctx->fGraph) {
     avfilter_graph_free(&ctx->fGraph);
     avfilter_inout_free(&ctx->out);
@@ -121,7 +121,7 @@ void videoFilterFree(AvFilter *ctx) {
   }
 }
 
-int avFilterPush(AvFilter *ctx, AVFrame *frame) {
+int avFilterPush(UmsAvFilter *ctx, AVFrame *frame) {
   int ret;
 
   ret = av_buffersrc_add_frame_flags(ctx->srcCtx, frame,
@@ -134,7 +134,7 @@ int avFilterPush(AvFilter *ctx, AVFrame *frame) {
   return 0;
 }
 
-int avFilterPull(AvFilter *ctx, AVFrame **frame) {
+int avFilterPull(UmsAvFilter *ctx, AVFrame **frame) {
   int ret;
   ret = av_buffersink_get_frame(ctx->sinkCtx, *frame);
   return ret;

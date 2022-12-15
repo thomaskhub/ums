@@ -31,9 +31,13 @@ cd $SOURCE
 #
 # https://github.com/FreeRDP/FreeRDP/issues/6072
 #
-git clone https://github.com/thomaskhub/FFmpeg.git ffmpeg-4.4
-cd ffmpeg-4.4
-git checkout release/4.4-acc-near-inf-error
+# git clone https://github.com/thomaskhub/FFmpeg.git ffmpeg-4.4
+# cd ffmpeg-4.4
+# git checkout release/4.4-acc-near-inf-error
+
+git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg-5.1
+cd ffmpeg-5.1
+git checkout release/5.1
 
 PATH="$BIN:$PATH" PKG_CONFIG_PATH="$BUILD/lib/pkgconfig" ./configure \
     --prefix="$BUILD" \

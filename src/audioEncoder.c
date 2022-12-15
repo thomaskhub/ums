@@ -8,8 +8,9 @@ int audioEncoderInit(AudioEncCtx *ctx) {
     return ret;
   }
 
-  ctx->timebase = ctx->encCtx->time_base;
   ctx->encCtx->bit_rate = ctx->bitrate;
+  ctx->encCtx->rc_buffer_size = ctx->bitrate;
+  ctx->encCtx->rc_max_rate = ctx->bitrate;
   ctx->encCtx->sample_fmt = AUDIO_SAMPLE_FMT;
   ctx->encCtx->sample_rate = AUDIO_RATE;
   ctx->encCtx->channel_layout = AUDIO_CH_LAYOUT;

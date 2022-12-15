@@ -23,13 +23,13 @@
 #include <libavfilter/buffersrc.h>
 #include <libavutil/opt.h>
 
-typedef struct AvFilter {
+typedef struct UmsAvFilter {
   AVFilterGraph *fGraph;
   AVFilterContext *sinkCtx;
   AVFilterContext *srcCtx;
   AVFilterInOut *in;
   AVFilterInOut *out;
-} AvFilter;
+} UmsAvFilter;
 
 /**
  * @brief initialize a video filter
@@ -46,7 +46,7 @@ typedef struct AvFilter {
  * @param aspectRatio pixel aspect ratio of vieo frame
  * @return int >= 0 in case of success, a negative AVERROR otherwise
  */
-int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
+int initAvFilter(UmsAvFilter *ctx, const char *fDesc, int width, int height,
                  int pixFmt, AVRational timebase, AVRational aspectRatio,
                  uint64_t smpFmt, int sampleRate, uint64_t chanLayout,
                  enum AVMediaType type);
@@ -58,7 +58,7 @@ int initAvFilter(AvFilter *ctx, const char *fDesc, int width, int height,
  * @param frame
  * @return int >=0 on success, negaive AVERROR code otherwise
  */
-int avFilterPush(AvFilter *ctx, AVFrame *frame);
+int avFilterPush(UmsAvFilter *ctx, AVFrame *frame);
 
 /**
  * @brief pull a video frame from the filter output
@@ -67,12 +67,12 @@ int avFilterPush(AvFilter *ctx, AVFrame *frame);
  * @param frame
  * @return int >=0 on success, negaive AVERROR code otherwise
  */
-int avFilterPull(AvFilter *ctx, AVFrame **frame);
+int avFilterPull(UmsAvFilter *ctx, AVFrame **frame);
 
 /**
  * @brief Release all resources allocated for the video filter
  *
  * @param ctx
  */
-void videoFilterFree(AvFilter *ctx);
+void videoFilterFree(UmsAvFilter *ctx);
 #endif

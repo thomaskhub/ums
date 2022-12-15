@@ -12,7 +12,7 @@ int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
   int tmp = frameCount * sizeof(AVFrame *);
   buf->buffer = malloc(frameCount * sizeof(AVFrame *));
   if (!buf->buffer) {
-    printf("Could not allocate doubleBuffer array....\n");
+    av_log(NULL, AV_LOG_FATAL, "Could not allocate doubleBuffer array....\n");
     exit(1);
   }
 
@@ -20,7 +20,7 @@ int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
     AVFrame *frame;
     frame = av_frame_alloc();
     if (!frame) {
-      printf("Could not allocate frame....\n");
+      av_log(NULL, AV_LOG_FATAL, "Could not allocate frame....\n");
       exit(1);
     }
 
@@ -52,6 +52,11 @@ int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
   buf->rdPtr = 0;
 
   return 0;
+}
+
+void avBufferClear(AvBuffer *buf) {
+  buf->wrPtr = 0;
+  buf->rdPtr = 0;
 }
 
 uint8_t avBufferFull(AvBuffer *buf) {

@@ -48,6 +48,8 @@ typedef struct {
 void rtmpInputStart(char *url);
 void rtmpInputStop();
 void rtmpInputJoin();
+AVRational rtmpGetVideoTimebase();
+AVRational rtmpGetAudioTimebase();
 
 /**
  * @brief function to get the rtmp input status
