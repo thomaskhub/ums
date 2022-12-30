@@ -29,4 +29,8 @@ RUN apt-get update && apt-get install -y \
     wget \
     yasm \
     zlib1g-dev \
-    ca-certificates
+    ca-certificates \
+    libssl-dev
+
+RUN cd /tmp && git clone https://github.com/eclipse/paho.mqtt.c.git paho
+RUN cd /tmp/paho && git checkout v1.3.12 && make && make install

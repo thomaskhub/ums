@@ -30,7 +30,21 @@
 #include "output.h"
 #include "rtmpInput.h"
 #include "utils.h"
+#include <MQTTAsync.h>
 
+#if !defined(_WIN32)
+#include <unistd.h>
+#else
+#include <windows.h>
+#endif
+ 
+#if defined(_WRS_KERNEL)
+#include <OsWrapper.h>
+#endif
+ 
+#define TOPIC       "ums"
+#define PAYLOAD     "Hello World!"
+#define TIMEOUT     10000L
 #define OPT_MODE 0
 #define OPT_RTMP_IN 1
 #define OPT_RTMP_OUT 2
@@ -69,6 +83,10 @@ char *postFiller = NULL;
 char *streamStart = NULL;
 char *sessionStart = NULL;
 char *sessionEnd = NULL;
+int disc_finished = 0;
+int subscribed = 0;
+int finished = 0;
+
 
 // Output configuration
 OutputCtxT vOutCfg[] = {
@@ -107,6 +125,11 @@ AudioEncCtx aOutCfg = {.bitrate = 64000};
 static DashCtxT dashCtx;
 static int cfgLength;
 static AVCodecContext **dashCodecList;
+static MQTTAsync client;
+MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer;
+char* broker_address = "tcp://127.0.0.1:1883";
+char* clientid = "ums";
+int QOS = 1;
 
 /**
  * @brief show help on how to use this application
@@ -316,6 +339,198 @@ int validateInput() {
   return -1;
 }
 
+void parse_input(char* message)
+{
+  char *ptr, *arg; 
+
+  printf("\nparsing message\n");
+  // Parse the input parameters
+  ptr = strtok_r(message, " ",&arg);
+  while (ptr != NULL) {
+
+    printf("%s\n", ptr);
+    switch (*ptr) {
+    case OPT_RTMP_IN:
+      rtmpInUrl = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_RTMP_OUT:
+      rtmpOutUrl = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_MODE:
+      mode = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_DASH:
+      dashManifestPath = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_REC:
+      recordPath = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_PRE_FILLER:
+      preFiller = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_SESSION_FILLER:
+      sessionFiller = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_POST_FILLER:
+      postFiller = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_STREAM_START:
+      streamStart = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_SESSION_START:
+      sessionStart = strtok_r(NULL," ", &arg);
+      break;
+    case OPT_SESSION_END:
+      sessionEnd = strtok_r(NULL," ", &arg);
+      break;
+
+    default:
+      break;
+    }
+    ptr = strtok_r(NULL," ", &arg);
+  }
+  //printf("%s\n", mode);
+}
+
+
+void connlost(void *context, char *cause)
+{
+        MQTTAsync client = (MQTTAsync)context;
+        MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer;
+        int rc;
+ 
+        av_log(NULL,AV_LOG_DEBUG, "\nConnection lost\n");
+        if (cause)
+                av_log(NULL, AV_LOG_ERROR, "     cause: %s\n", cause);
+ 
+        av_log(NULL, AV_LOG_DEBUG,"Reconnecting\n");
+        conn_opts.keepAliveInterval = 20;
+        conn_opts.cleansession = 1;
+        if ((rc = MQTTAsync_connect(client, &conn_opts)) != MQTTASYNC_SUCCESS)
+        {
+                av_log(NULL, AV_LOG_ERROR,"Failed to start connect, return code %d\n", rc);
+                finished = 1;
+        }
+}
+ 
+ 
+int msgarrvd(void *context, char *topicName, int topicLen, MQTTAsync_message *message)
+{
+    printf("message received\n");
+    av_log(NULL,AV_LOG_DEBUG, "Message arrived\n");
+    printf("message arrived on topic %s. message is %s\n", topicName,(char*)message->payload);
+    av_log(NULL, AV_LOG_DEBUG, "     topic: %s\n", topicName);
+    av_log(NULL, AV_LOG_DEBUG, "   message: %.*s\n", message->payloadlen, (char*)message->payload);
+    if (strcmp(topicName, TOPIC) ==0)
+    {
+      parse_input((char*)message->payload);
+    }
+    MQTTAsync_freeMessage(&message);
+    MQTTAsync_free(topicName);
+    return 0;
+}
+ 
+void onDisconnectFailure(void* context, MQTTAsync_failureData* response)
+{
+        av_log(NULL,AV_LOG_ERROR, "Disconnect failed, rc %d\n", response->code);
+        disc_finished = 1;
+}
+ 
+void onDisconnect(void* context, MQTTAsync_successData* response)
+{
+        av_log(NULL,AV_LOG_DEBUG,"Successful disconnection\n");
+        disc_finished = 1;
+}
+ 
+void onSubscribe(void* context, MQTTAsync_successData* response)
+{
+        av_log(NULL, AV_LOG_DEBUG, "Subscribe succeeded\n");
+        subscribed = 1;
+}
+ 
+void onSubscribeFailure(void* context, MQTTAsync_failureData* response)
+{
+        av_log(NULL,AV_LOG_ERROR,"Subscribe failed, rc %d\n", response->code);
+        finished = 1;
+}
+ 
+ 
+void onConnectFailure(void* context, MQTTAsync_failureData* response)
+{
+  printf("connection failure %d", response->code);
+        av_log(NULL, AV_LOG_ERROR,"Connect failed, rc %d\n", response->code);
+        finished = 1;
+}
+ 
+ 
+void onConnect(void* context, MQTTAsync_successData* response)
+{
+        MQTTAsync client = (MQTTAsync)context;
+        MQTTAsync_responseOptions opts = MQTTAsync_responseOptions_initializer;
+        int rc;
+ 
+        av_log(NULL,AV_LOG_DEBUG,"Successful connection\n");
+ 
+        av_log(NULL,AV_LOG_DEBUG,"Subscribing to topic %s\nfor client %s using QoS%d\n\n"
+           "Press Q<Enter> to quit\n\n", TOPIC, clientid, QOS);
+        opts.onSuccess = onSubscribe;
+        opts.onFailure = onSubscribeFailure;
+        opts.context = client;
+        if ((rc = MQTTAsync_subscribe(client, TOPIC, QOS, &opts)) != MQTTASYNC_SUCCESS)
+        {
+                av_log(NULL,AV_LOG_ERROR, "Failed to start subscribe, return code %d\n", rc);
+                finished = 1;
+        }
+}
+ 
+
+int mqtt_connection()
+{
+    int clientCreateCode, connectionStartCode, callbackCode;
+
+    MQTTAsync client;
+    MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer;
+    MQTTAsync_disconnectOptions disc_opts = MQTTAsync_disconnectOptions_initializer;
+
+    av_log(NULL, AV_LOG_DEBUG, "creating new mqtt client");
+
+    clientCreateCode = MQTTAsync_create(&client, broker_address, clientid, MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    if (clientCreateCode != MQTTASYNC_SUCCESS)
+    {
+      av_log(NULL, AV_LOG_ERROR,"Failed to create client, return code %d\n", clientCreateCode);
+      exit(1);
+    }
+    if ((callbackCode = MQTTAsync_setCallbacks(client, client, connlost, msgarrvd, NULL)) != MQTTASYNC_SUCCESS)
+    {
+      av_log(NULL, AV_LOG_ERROR, "Failed to set callbacks, return code %d\n", callbackCode);
+      callbackCode = EXIT_FAILURE;
+    }
+
+    conn_opts.keepAliveInterval = 20;
+    conn_opts.cleansession = 1;
+    conn_opts.onSuccess = onConnect;
+    conn_opts.onFailure = onConnectFailure;
+    conn_opts.context = client;
+      
+    av_log(NULL, AV_LOG_DEBUG, "connecting to mqtt broker");
+
+    connectionStartCode= MQTTAsync_connect(client, &conn_opts);
+    
+    if (connectionStartCode!= MQTTASYNC_SUCCESS)
+    {
+        av_log(NULL,AV_LOG_ERROR, "Failed to connect, return code %d\n", connectionStartCode);
+        exit(1);
+    }
+    while (!subscribed && !finished)
+      sleep(1);
+    
+    if (finished)
+    {
+      av_log(NULL, AV_LOG_DEBUG, "mqtt connection ended");
+    }
+
+}
+
 /**
  * @brief Of cource the entry point to the application :)
  *
@@ -328,65 +543,21 @@ int main(int argc, char **argv) {
   char *dashDirName;
 
   // if no parameters are being passes show the help
-  if (argc < 2) {
+  /*if (argc < 2) {
     showHelp();
     return 1;
-  }
+  }*/
 
-  // Parse the input parameters
-  while (1) {
-    c = getopt_long_only(argc, argv, "", longOptions, &optionIndex);
-    if (c == -1) {
-      break;
-    }
-
-    switch (c) {
-    case OPT_RTMP_IN:
-      rtmpInUrl = optarg;
-      break;
-    case OPT_RTMP_OUT:
-      rtmpOutUrl = optarg;
-      break;
-    case OPT_MODE:
-      mode = optarg;
-      break;
-    case OPT_DASH:
-      dashManifestPath = optarg;
-      break;
-    case OPT_REC:
-      recordPath = optarg;
-      break;
-    case OPT_PRE_FILLER:
-      preFiller = optarg;
-      break;
-    case OPT_SESSION_FILLER:
-      sessionFiller = optarg;
-      break;
-    case OPT_POST_FILLER:
-      postFiller = optarg;
-      break;
-    case OPT_STREAM_START:
-      streamStart = optarg;
-      break;
-    case OPT_SESSION_START:
-      sessionStart = optarg;
-      break;
-    case OPT_SESSION_END:
-      sessionEnd = optarg;
-      break;
-
-    default:
-
-      exit(1);
-      break;
-    }
-  }
+  mqtt_connection();
+  printf("mqtt connectin Successful\n");
+  //printf("%s\n", mode);
 
   // before we continue validate the input data
   if (validateInput() < 0) {
     return 1;
   };
 
+  printf("input validated successfully\n");
   // Rtmp output is optional, so if set we enable rtmp output for the high res output
   if (rtmpOutUrl) {
     vOutCfg[0].url = rtmpOutUrl;
@@ -420,7 +591,7 @@ int main(int argc, char **argv) {
   }
 
   rtmpInputStart(rtmpInUrl);
-
+  printf("rtmp input started\n");
   ret = audioEncoderInit(&aOutCfg);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "main::audio encoder init failed\n");
