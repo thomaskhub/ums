@@ -31,6 +31,7 @@
 #include "rtmpInput.h"
 #include "utils.h"
 #include <MQTTAsync.h>
+#include <pthread.h>
 
 #if !defined(_WIN32)
 #include <unistd.h>
@@ -127,7 +128,7 @@ static int cfgLength;
 static AVCodecContext **dashCodecList;
 static MQTTAsync client;
 MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer;
-char* broker_address = "tcp://127.0.0.1:1883";
+//char* broker_address = "tcp://127.0.0.1:1883";
 char* clientid = "ums";
 int QOS = 1;
 
@@ -339,57 +340,64 @@ int validateInput() {
   return -1;
 }
 
-void parse_input(char* message)
+void parse_input_args(int argc, char **argv)
 {
-  char *ptr, *arg; 
+  int c, optionIndex;
 
   printf("\nparsing message\n");
   // Parse the input parameters
-  ptr = strtok_r(message, " ",&arg);
-  while (ptr != NULL) {
+  while(1)
+  {
 
-    printf("%s\n", ptr);
-    switch (*ptr) {
+    c = getopt_long_only(argc, argv, "", longOptions, &optionIndex);
+    if (c == -1) {
+      break;
+    }
+    switch (c) {
     case OPT_RTMP_IN:
-      rtmpInUrl = strtok_r(NULL," ", &arg);
+      rtmpInUrl = optarg;
       break;
     case OPT_RTMP_OUT:
-      rtmpOutUrl = strtok_r(NULL," ", &arg);
+      rtmpOutUrl = optarg;
       break;
     case OPT_MODE:
-      mode = strtok_r(NULL," ", &arg);
+      mode = optarg;
       break;
     case OPT_DASH:
-      dashManifestPath = strtok_r(NULL," ", &arg);
+      dashManifestPath = optarg;
       break;
     case OPT_REC:
-      recordPath = strtok_r(NULL," ", &arg);
+      recordPath = optarg;
       break;
     case OPT_PRE_FILLER:
-      preFiller = strtok_r(NULL," ", &arg);
+      preFiller = optarg;
       break;
     case OPT_SESSION_FILLER:
-      sessionFiller = strtok_r(NULL," ", &arg);
+      sessionFiller = optarg;
       break;
     case OPT_POST_FILLER:
-      postFiller = strtok_r(NULL," ", &arg);
+      postFiller = optarg;
       break;
     case OPT_STREAM_START:
-      streamStart = strtok_r(NULL," ", &arg);
+      streamStart = optarg;
       break;
     case OPT_SESSION_START:
-      sessionStart = strtok_r(NULL," ", &arg);
+      sessionStart = optarg;
       break;
     case OPT_SESSION_END:
-      sessionEnd = strtok_r(NULL," ", &arg);
+      sessionEnd = optarg;
       break;
 
     default:
       break;
     }
-    ptr = strtok_r(NULL," ", &arg);
   }
   //printf("%s\n", mode);
+}
+
+void parse_input_mqtt()
+{
+
 }
 
 
@@ -423,7 +431,7 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTAsync_message *me
     av_log(NULL, AV_LOG_DEBUG, "   message: %.*s\n", message->payloadlen, (char*)message->payload);
     if (strcmp(topicName, TOPIC) ==0)
     {
-      parse_input((char*)message->payload);
+      parse_input_mqtt();
     }
     MQTTAsync_freeMessage(&message);
     MQTTAsync_free(topicName);
@@ -444,6 +452,7 @@ void onDisconnect(void* context, MQTTAsync_successData* response)
  
 void onSubscribe(void* context, MQTTAsync_successData* response)
 {
+        printf("subscribed to topic\n");
         av_log(NULL, AV_LOG_DEBUG, "Subscribe succeeded\n");
         subscribed = 1;
 }
@@ -484,17 +493,22 @@ void onConnect(void* context, MQTTAsync_successData* response)
 }
  
 
-int mqtt_connection()
+void *mqtt_connection(void* mqtt_url)
 {
     int clientCreateCode, connectionStartCode, callbackCode;
 
+    printf("inside mqtt connection*****\n");
     MQTTAsync client;
     MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer;
     MQTTAsync_disconnectOptions disc_opts = MQTTAsync_disconnectOptions_initializer;
+    char *broker_address = (char*)mqtt_url;
+    char *username = getenv("MQTT_username");
+    char *password = getenv("MQTT_password");
+
 
     av_log(NULL, AV_LOG_DEBUG, "creating new mqtt client");
 
-    clientCreateCode = MQTTAsync_create(&client, broker_address, clientid, MQTTCLIENT_PERSISTENCE_NONE, NULL);
+    clientCreateCode = MQTTAsync_create(&client, broker_address, username, MQTTCLIENT_PERSISTENCE_NONE, NULL);
     if (clientCreateCode != MQTTASYNC_SUCCESS)
     {
       av_log(NULL, AV_LOG_ERROR,"Failed to create client, return code %d\n", clientCreateCode);
@@ -511,6 +525,8 @@ int mqtt_connection()
     conn_opts.onSuccess = onConnect;
     conn_opts.onFailure = onConnectFailure;
     conn_opts.context = client;
+    conn_opts.username = username;
+    conn_opts.password = password;
       
     av_log(NULL, AV_LOG_DEBUG, "connecting to mqtt broker");
 
@@ -528,6 +544,7 @@ int mqtt_connection()
     {
       av_log(NULL, AV_LOG_DEBUG, "mqtt connection ended");
     }
+    //pthread_exit()
 
 }
 
@@ -541,6 +558,7 @@ int mqtt_connection()
 int main(int argc, char **argv) {
   int ret, i, c, optionIndex;
   char *dashDirName;
+  pthread_t threadId;
 
   // if no parameters are being passes show the help
   /*if (argc < 2) {
@@ -548,15 +566,24 @@ int main(int argc, char **argv) {
     return 1;
   }*/
 
-  mqtt_connection();
-  printf("mqtt connectin Successful\n");
-  //printf("%s\n", mode);
+  char* mqtt_url = getenv("MQTT_URL");
+  printf("url is %s\n", mqtt_url);
+  if (mqtt_url)
+  {
+    pthread_create(&threadId,NULL, mqtt_connection, mqtt_url);
+  }
+  else
+  {
+    printf("parsing arguments from cmdline\n");
+    parse_input_args(argc, argv);
+  }
 
+  pthread_join(threadId,NULL);
+  //sleep(2);
   // before we continue validate the input data
   if (validateInput() < 0) {
     return 1;
   };
-
   printf("input validated successfully\n");
   // Rtmp output is optional, so if set we enable rtmp output for the high res output
   if (rtmpOutUrl) {
