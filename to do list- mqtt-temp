@@ -1,0 +1,6 @@
+to do list
+- add parsing from mqtt message
+- mqtt connection keepalive/ periodically connects
+- ums heartbeat to broker
+- thread running in the background, no thread wait in main
+- main sleep as we wait for mqtt message
