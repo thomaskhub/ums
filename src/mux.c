@@ -91,7 +91,7 @@ void closeCodec(AVCodecContext **codec) { avcodec_free_context(codec); }
 
 int openDecoder(AVCodecContext **decCtx, AVCodec **decoder, AVStream *stream) {
   int ret;
-  (*decoder) = avcodec_find_decoder(stream->codecpar->codec_id);
+  (*decoder) = (AVCodec *)avcodec_find_decoder(stream->codecpar->codec_id);
   if (!(*decoder)) {
     return AVERROR_DECODER_NOT_FOUND;
   }
@@ -113,7 +113,7 @@ int openDecoder(AVCodecContext **decCtx, AVCodec **decoder, AVStream *stream) {
 }
 
 int initEncoder(AVCodecContext **encCtx, AVCodec **encoder, int codecId) {
-  (*encoder) = avcodec_find_encoder(codecId);
+  (*encoder) = (AVCodec *)avcodec_find_encoder(codecId);
   if (!(*encoder)) {
     return AVERROR_UNKNOWN;
   }
