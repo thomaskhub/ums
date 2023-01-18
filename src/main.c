@@ -16,6 +16,7 @@
 * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
 * USA.
 */
+#include <MQTTClient.h>
 #include <dirent.h>
 #include <getopt.h>
 #include <libavutil/log.h>
@@ -27,6 +28,7 @@
 #include "config.h"
 #include "dash.h"
 #include "inputSwitch.h"
+#include "mqtt.h"
 #include "output.h"
 #include "rtmpInput.h"
 #include "utils.h"
@@ -64,14 +66,17 @@ static struct option longOptions[] = {
 char *mode = NULL;
 char *rtmpInUrl = NULL;
 char *rtmpOutUrl = NULL;
-char *dashManifestPath = NULL;
+char *dashPath = NULL;
 char *recordPath = NULL;
 char *preFiller = NULL;
 char *sessionFiller = NULL;
 char *postFiller = NULL;
 char *streamStart = NULL;
+char *doorOpen = NULL;
 char *sessionStart = NULL;
 char *sessionEnd = NULL;
+
+Mqtt mqttContext;
 
 // Output configuration
 OutputCtxT vOutCfg[] = {
@@ -138,7 +143,7 @@ void *_statsWorker(void *args) {
   double inputSwitchFps = 0;
   double inputSwitchSR = 0;
   while (1) {
-    av_usleep(10000000); // approx 1s interval
+    av_usleep(3000000);
 
     inputSwitchDuration = (av_gettime_relative() - global.inputSwitchStartTime) / 1000000.0;
     inputSwitchFps = (double)global.inputSwitchVFrameCnt / inputSwitchDuration;
@@ -147,6 +152,19 @@ void *_statsWorker(void *args) {
     printf("inputSwitch:: Video FPS = %f, Audio Sample Rate = %f\n", inputSwitchFps, inputSwitchSR);
     printf("main::runtime = %f\n", (av_gettime_relative() - global.mainStartTime) / 1000000.0);
     printf("rtmpInput::status = %s\n", global.rtmpInputStatus);
+
+    // Send and forget
+    MQTTClient_message message = MQTTClient_message_initializer;
+    MQTTClient_token token;
+
+    char payload[2048];
+    sprintf(payload, "{\"cmd\":\"update\",\"payload\":{\"fps\":\"%f\",\"sps\":\"%f\", \"rtmpInputStatus\":\"%s\"}}", inputSwitchFps, inputSwitchSR, global.rtmpInputStatus);
+
+    message.payload = payload;
+    message.payloadlen = strlen(payload);
+    message.qos = 2;
+    message.retained = 0;
+    MQTTClient_publishMessage(mqttContext.client, "testing", &message, &token);
   }
 }
 
@@ -255,7 +273,7 @@ int validateInput() {
       return -1;
     }
 
-    if (dashManifestPath == NULL) {
+    if (dashPath == NULL) {
       printf("Error: dash argument is null\n");
       return -1;
     }
@@ -284,6 +302,8 @@ int validateInput() {
       }
     }
 
+    // TODO: check if now as default time is ok or if this validation
+    // should be done differently
     if (streamStart == NULL)
       getNowAsIso(&streamStart);
 
@@ -293,8 +313,11 @@ int validateInput() {
     if (sessionEnd == NULL)
       getNowAsIso(&sessionEnd);
 
+    if (doorOpen == NULL)
+      getNowAsIso(&sessionEnd);
+
     if (!startsWith(rtmpInUrl, "rtmp://") && !startsWith(rtmpInUrl, "rtmps://")) {
-      printf("Error: rtmpIn is not a valid rtmp url --> %s\n", rtmpInUrl);
+      printf("Error: rtmpInUrl is not a valid rtmp url --> %s\n", rtmpInUrl);
       return -1;
     }
 
@@ -306,23 +329,32 @@ int validateInput() {
     }
 
     // check if manifest file path exists
-    strcpy(tmpString, dashManifestPath);
-    dirname(tmpString);
+    if (!dashPath) {
+      av_log(NULL, AV_LOG_ERROR, "dash parameter not defined\n");
+      return -1;
+    }
+
+    printf("Dash manifest path --> %s\n", dashPath);
+    strcpy(tmpString, dashPath);
+    // dirname(tmpString);
     dir = opendir(tmpString);
     if (!dir) {
-      closedir(dir);
+      // closedir(dir);
       printf("Error: dash output directory cannot be opened %s\n", tmpString);
       return -1;
     }
     closedir(dir);
 
     // check if recording path exists
+    if (!recordPath) {
+      av_log(NULL, AV_LOG_ERROR, "recordPath parameter not defined\n");
+      return -1;
+    }
+
     strcpy(tmpString, recordPath);
-    dirname(tmpString);
     dir = opendir(tmpString);
     if (!dir) {
-      closedir(dir);
-      printf("Error: recording output directory cannot be opened");
+      printf("Error: recording output directory cannot be opened\n");
       return -1;
     }
     closedir(dir);
@@ -345,66 +377,85 @@ int main(int argc, char **argv) {
   int ret, i, c, optionIndex;
   char *dashDirName;
 
-  av_log_set_level(AV_LOG_ERROR);
+  char *mqttUrl = getenv("mqttUrl");
 
-  // if no parameters are being passes show the help
-  if (argc < 2) {
-    showHelp();
-    return 1;
-  }
+  // Start mqtt only if url was provided
+  if (mqttUrl != NULL) {
+    mqttStart(&mqttContext, mqttUrl);
+    rtmpInUrl = getenv("rtmpInUrl");
+    rtmpOutUrl = getenv("rtmpOutUrl");
+    mode = getenv("mode");
+    dashPath = getenv("dash");
+    recordPath = getenv("recordPath");
+    preFiller = getenv("preFiller");
+    sessionFiller = getenv("sessionFiller");
+    postFiller = getenv("postFiller");
+    streamStart = getenv("rtmpOutUrl");
+    doorOpen = getenv("doorOpen");
+    sessionStart = getenv("rtmpOutUrl");
+    sessionEnd = getenv("rtmpOutUrl");
 
-  // Parse the input parameters
-  while (1) {
-    c = getopt_long_only(argc, argv, "", longOptions, &optionIndex);
-    if (c == -1) {
-      break;
+  } else {
+
+    // if no parameters are being passes show the help
+    if (argc < 2) {
+      showHelp();
+      return 1;
     }
+    // Parse the input parameters
+    while (1) {
+      c = getopt_long_only(argc, argv, "", longOptions, &optionIndex);
+      if (c == -1) {
+        break;
+      }
 
-    switch (c) {
-    case OPT_RTMP_IN:
-      rtmpInUrl = optarg;
-      break;
-    case OPT_RTMP_OUT:
-      rtmpOutUrl = optarg;
-      break;
-    case OPT_MODE:
-      mode = optarg;
-      break;
-    case OPT_DASH:
-      dashManifestPath = optarg;
-      break;
-    case OPT_REC:
-      recordPath = optarg;
-      break;
-    case OPT_PRE_FILLER:
-      preFiller = optarg;
-      break;
-    case OPT_SESSION_FILLER:
-      sessionFiller = optarg;
-      break;
-    case OPT_POST_FILLER:
-      postFiller = optarg;
-      break;
-    case OPT_STREAM_START:
-      streamStart = optarg;
-      break;
-    case OPT_SESSION_START:
-      sessionStart = optarg;
-      break;
-    case OPT_SESSION_END:
-      sessionEnd = optarg;
-      break;
+      switch (c) {
+      case OPT_RTMP_IN:
+        rtmpInUrl = optarg;
+        break;
+      case OPT_RTMP_OUT:
+        rtmpOutUrl = optarg;
+        break;
+      case OPT_MODE:
+        mode = optarg;
+        break;
+      case OPT_DASH:
+        dashPath = optarg;
+        break;
+      case OPT_REC:
+        recordPath = optarg;
+        break;
+      case OPT_PRE_FILLER:
+        preFiller = optarg;
+        break;
+      case OPT_SESSION_FILLER:
+        sessionFiller = optarg;
+        break;
+      case OPT_POST_FILLER:
+        postFiller = optarg;
+        break;
+      case OPT_STREAM_START:
+        streamStart = optarg;
+        break;
+      case OPT_SESSION_START:
+        sessionStart = optarg;
+        break;
+      case OPT_SESSION_END:
+        sessionEnd = optarg;
+        break;
 
-    default:
-      exit(1);
-      break;
+      default:
+        exit(1);
+        break;
+      }
     }
   }
-
   // before we continue validate the input data
   if (validateInput() < 0) {
     return 1;
   };
+
+  av_log_set_level(AV_LOG_ERROR);
 
   // Rtmp output is optional, so if set we enable rtmp output for the high res output
   if (rtmpOutUrl) {
@@ -413,37 +464,24 @@ int main(int argc, char **argv) {
 
   // MPEGTS recording is optional, so if set we enable recording for the high res output
   if (recordPath) {
-    vOutCfg[0].path = recordPath;
+    char rPath[512];
+    sprintf(rPath, "%s/rec.ts", recordPath);
+    vOutCfg[0].path = rPath;
   }
 
-  // av_log_set_level(AV_LOG_QUIET);
   signal(SIGINT, signalCloseHandler);
-  // mtrace();
-
-  dashDirName = dirname(strdup(dashManifestPath));
-  ret = mkdirP(dashDirName);
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "main::could not create dash dir\n");
-    exit(1);
-  }
-
-  cleanDashDir(dashDirName);
+  cleanDashDir(dashPath);
 
   av_log(NULL, AV_LOG_DEBUG, "main::going to start the media server\n");
   cfgLength = sizeof(vOutCfg) / sizeof(vOutCfg[0]);
 
   dashCodecList = malloc(cfgLength * sizeof(AVCodecContext *));
   if (!dashCodecList) {
-    av_log(NULL, AV_LOG_ERROR, "main::could not allocated codec list. abort.");
+    av_log(NULL, AV_LOG_ERROR, "main::could not allocated codec list. abort.\n");
     exit(1);
   }
 
-  // Start a thread to print stream stats, this should be replaced with MQTT
-
   pthread_create(&inputSwitchThread, NULL, _statsWorker, NULL);
-
-  //----
-
   rtmpInputStart(rtmpInUrl);
 
   ret = audioEncoderInit(&aOutCfg);
@@ -472,7 +510,11 @@ int main(int argc, char **argv) {
     }
   }
 
-  dashCtx.dashIndexPath = dashManifestPath;
+  char dPath[1024];
+  sprintf(dPath, "%s/index.mpd", dashPath);
+  dashCtx.dashIndexPath = dPath;
+  printf("PAth --> %s \n", dashCtx.dashIndexPath);
+
   dashCtx.streamLen = cfgLength;
   ret = startDash(&dashCtx, dashCodecList, aOutCfg.encCtx);
   if (ret < 0) {

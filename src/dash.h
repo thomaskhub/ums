@@ -36,7 +36,7 @@ typedef struct DashCtxT {
   AVRational timebase;
 
   /**path to the manifest file (index.mpd)*/
-  char *dashIndexPath;
+  const char *dashIndexPath;
 
 } DashCtxT;
 
