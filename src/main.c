@@ -33,7 +33,6 @@
 #include "rtmpInput.h"
 #include "utils.h"
 
-#define OPT_MODE 0
 #define OPT_RTMP_IN 1
 #define OPT_RTMP_OUT 2
 #define OPT_DASH 3
@@ -49,7 +48,6 @@ volatile GlobalT global;
 pthread_t inputSwitchThread;
 
 static struct option longOptions[] = {
-    {"mode", required_argument, 0, OPT_MODE},
     {"rtmpIn", required_argument, 0, OPT_RTMP_IN},
     {"rtmpOut", required_argument, 0, OPT_RTMP_OUT},
     {"dash", required_argument, 0, OPT_DASH},
@@ -63,7 +61,6 @@ static struct option longOptions[] = {
     {0, 0, 0, 0},
 };
 
-char *mode = NULL;
 char *rtmpInUrl = NULL;
 char *rtmpOutUrl = NULL;
 char *dashPath = NULL;
@@ -124,17 +121,20 @@ void showHelp() {
   printf("Usage: ums [GNU long options] ...\n");
 
   printf("GNU long options:\n");
-  printf("\t--mode [mode]                : can be live, vod, vas (video-as-stream)\n");
-  printf("\t--rtmpIn url                 : url is rtmp consume url video\n");
-  printf("\t--rtmpOut url                : url is rtmp produce url (optional)\n");
-  printf("\t--dash path                  : directory in which to store dash/hls output data\n");
-  printf("\t--rec path                   : path to store the MPEGTS recording (optional)\n");
-  printf("\t--preF path                  : path to the pre-session filler jpg\n");
-  printf("\t--sessionF path              : path to the session filler jpg\n");
-  printf("\t--postF path                 : path to the post-session filler jpg\n");
-  printf("\t--streamStart ISO_TIMESTAMP  : stream start ISO formated string\n");
-  printf("\t--sessionStart ISO_TIMESTAMP : session start ISO formated string\n");
-  printf("\t--sessionEnd ISO_TIMESTAMP   : session end ISO formated string\n");
+
+  printf("\t--rtmpInUrl url               : url is rtmp consume url video\n");
+  printf("\t--rtmpOutUrl url              : url is rtmp produce url (optional)\n");
+  printf("\t--dash path                   : directory in which to store dash/hls output data\n");
+  printf("\t--recordPath path             : path to store the MPEGTS recording (optional)\n");
+  printf("\t--preFiller path              : path to the pre-session filler jpg\n");
+  printf("\t--sessionFiller path          : path to the session filler jpg\n");
+  printf("\t--postFiller path             : path to the post-session filler jpg\n");
+  printf("\t--streamStart ISO_TIMESTAMP   : stream start ISO formated string\n");
+  printf("\t--sessionStart ISO_TIMESTAMP  : session start ISO formated string\n");
+  printf("\t--sessionEnd ISO_TIMESTAMP    : session end ISO formated string\n");
+  printf("\t--mqttUrl                     : mqtt broker url\n");
+  printf("\t--mqttId                      : mqtt id\n");
+  printf("\t--mqttToken                   : mqtt JWT token\n");
 }
 
 // TODO: remove this and replace this with MQTT thread
@@ -158,13 +158,13 @@ void *_statsWorker(void *args) {
     MQTTClient_token token;
 
     char payload[2048];
-    sprintf(payload, "{\"cmd\":\"update\",\"payload\":{\"fps\":\"%f\",\"sps\":\"%f\", \"rtmpInputStatus\":\"%s\"}}", inputSwitchFps, inputSwitchSR, global.rtmpInputStatus);
+    sprintf(payload, "{\"cmd\":\"update\",\"payload\":{\"sessionId\":\"%s\",\"fps\":\"%f\",\"sampleRate\":\"%f\", \"rtmpInputStatus\":\"%s\"}}", getenv("sessionId"), inputSwitchFps, inputSwitchSR, global.rtmpInputStatus);
 
     message.payload = payload;
     message.payloadlen = strlen(payload);
     message.qos = 2;
     message.retained = 0;
-    MQTTClient_publishMessage(mqttContext.client, "testing", &message, &token);
+    MQTTClient_publishMessage(mqttContext.client, getenv("mqttPublish"), &message, &token);
   }
 }
 
@@ -259,111 +259,96 @@ int validateInput() {
   char tmpString[2048];
   DIR *dir;
 
-  if (!mode) {
-    printf("Error: mode is not set\n");
+  if (rtmpInUrl == NULL) {
+    printf("Error: rtmpIn argument is null\n");
     return -1;
   }
 
-  //
-  // validate inputs for live mode
-  //
-  if (!strcmp(mode, "live")) {
-    if (rtmpInUrl == NULL) {
-      printf("Error: rtmpIn argument is null\n");
-      return -1;
-    }
-
-    if (dashPath == NULL) {
-      printf("Error: dash argument is null\n");
-      return -1;
-    }
-
-    if (preFiller == NULL || sessionFiller == NULL || postFiller == NULL) {
-      printf("Error: filler configuration incorrect\n");
-      return -1;
-    }
-
-    // check filler files only in live mode, all other modes do not need this
-    if (strcmp(mode, "live") == 0) {
-
-      if (!fileExists(preFiller)) {
-        printf("Error: pre filler file not found\n");
-        return -1;
-      }
-
-      if (!fileExists(sessionFiller)) {
-        printf("Error: session filler file not found\n");
-        return -1;
-      }
-
-      if (!fileExists(postFiller)) {
-        printf("Error: post filler file not found\n");
-        return -1;
-      }
-    }
-
-    // TODO: check if now as default time is ok or if this validation
-    // should be done differently
-    if (streamStart == NULL)
-      getNowAsIso(&streamStart);
-
-    if (sessionStart == NULL)
-      getNowAsIso(&sessionStart);
-
-    if (sessionEnd == NULL)
-      getNowAsIso(&sessionEnd);
-
-    if (doorOpen == NULL)
-      getNowAsIso(&sessionEnd);
-
-    if (!startsWith(rtmpInUrl, "rtmp://") && !startsWith(rtmpInUrl, "rtmps://")) {
-      printf("Error: rtmpInUrl is not a valid rtmp url --> %s\n", rtmpInUrl);
-      return -1;
-    }
-
-    if (rtmpOutUrl != NULL) {
-      if (!startsWith(rtmpOutUrl, "rtmp://") && !startsWith(rtmpOutUrl, "rtmps://")) {
-        printf("Error: rtmpOut is not a valid rtmp url --> %s\n", rtmpOutUrl);
-        return -1;
-      }
-    }
-
-    // check if manifest file path exists
-    if (!dashPath) {
-      av_log(NULL, AV_LOG_ERROR, "dash parameter not defined\n");
-      return -1;
-    }
-
-    printf("Dash manifest path --> %s\n", dashPath);
-    strcpy(tmpString, dashPath);
-    // dirname(tmpString);
-    dir = opendir(tmpString);
-    if (!dir) {
-      // closedir(dir);
-      printf("Error: dash output directory cannot be opened %s\n", tmpString);
-      return -1;
-    }
-    closedir(dir);
-
-    // check if recording path exists
-    if (!recordPath) {
-      av_log(NULL, AV_LOG_ERROR, "recordPath parameter not defined\n");
-      return -1;
-    }
-
-    strcpy(tmpString, recordPath);
-    dir = opendir(tmpString);
-    if (!dir) {
-      printf("Error: recording output directory cannot be opened\n");
-      return -1;
-    }
-    closedir(dir);
-
-    return 0;
+  if (dashPath == NULL) {
+    printf("Error: dash argument is null\n");
+    return -1;
   }
 
-  printf("Error: unsupported mode --> %s\n", mode);
-  return -1;
+  if (preFiller == NULL || sessionFiller == NULL || postFiller == NULL) {
+    printf("Error: filler configuration incorrect\n");
+    return -1;
+  }
+
+  // check filler files only in live mode, all other modes do not need this
+
+  if (!fileExists(preFiller)) {
+    printf("Error: pre filler file not found [%s]\n", preFiller);
+    return -1;
+  }
+
+  if (!fileExists(sessionFiller)) {
+    printf("Error: session filler file not found [%s]\n", sessionFiller);
+    return -1;
+  }
+
+  if (!fileExists(postFiller)) {
+    printf("Error: post filler file not found  [%s]\n", postFiller);
+    return -1;
+  }
+
+  // TODO: check if now as default time is ok or if this validation
+  // should be done differently
+  if (streamStart == NULL)
+    getNowAsIso(&streamStart);
+
+  if (sessionStart == NULL)
+    getNowAsIso(&sessionStart);
+
+  if (sessionEnd == NULL)
+    getNowAsIso(&sessionEnd);
+
+  if (doorOpen == NULL)
+    getNowAsIso(&sessionEnd);
+
+  if (!startsWith(rtmpInUrl, "rtmp://") && !startsWith(rtmpInUrl, "rtmps://")) {
+    printf("Error: rtmpInUrl is not a valid rtmp url --> %s\n", rtmpInUrl);
+    return -1;
+  }
+
+  if (rtmpOutUrl != NULL) {
+    if (!startsWith(rtmpOutUrl, "rtmp://") && !startsWith(rtmpOutUrl, "rtmps://")) {
+      printf("Error: rtmpOut is not a valid rtmp url --> %s\n", rtmpOutUrl);
+      return -1;
+    }
+  }
+
+  // check if manifest file path exists
+  if (!dashPath) {
+    av_log(NULL, AV_LOG_ERROR, "dash parameter not defined\n");
+    return -1;
+  }
+
+  printf("Dash manifest path --> %s\n", dashPath);
+  strcpy(tmpString, dashPath);
+  // dirname(tmpString);
+  dir = opendir(tmpString);
+  if (!dir) {
+    // closedir(dir);
+    printf("Error: dash output directory cannot be opened %s\n", tmpString);
+    return -1;
+  }
+  closedir(dir);
+
+  // check if recording path exists
+  if (!recordPath) {
+    av_log(NULL, AV_LOG_ERROR, "recordPath parameter not defined\n");
+    return -1;
+  }
+
+  strcpy(tmpString, recordPath);
+  dir = opendir(tmpString);
+  if (!dir) {
+    printf("Error: recording output directory cannot be opened\n");
+    return -1;
+  }
+  closedir(dir);
+
+  return 0;
 }
 
 /**
@@ -384,16 +369,15 @@ int main(int argc, char **argv) {
     mqttStart(&mqttContext, mqttUrl);
     rtmpInUrl = getenv("rtmpInUrl");
     rtmpOutUrl = getenv("rtmpOutUrl");
-    mode = getenv("mode");
     dashPath = getenv("dash");
     recordPath = getenv("recordPath");
     preFiller = getenv("preFiller");
     sessionFiller = getenv("sessionFiller");
     postFiller = getenv("postFiller");
-    streamStart = getenv("rtmpOutUrl");
+    streamStart = getenv("streamStart");
     doorOpen = getenv("doorOpen");
-    sessionStart = getenv("rtmpOutUrl");
-    sessionEnd = getenv("rtmpOutUrl");
+    sessionStart = getenv("sessionStart");
+    sessionEnd = getenv("sessionEnd");
 
   } else {
 
@@ -415,9 +399,6 @@ int main(int argc, char **argv) {
         break;
       case OPT_RTMP_OUT:
         rtmpOutUrl = optarg;
-        break;
-      case OPT_MODE:
-        mode = optarg;
         break;
       case OPT_DASH:
         dashPath = optarg;
