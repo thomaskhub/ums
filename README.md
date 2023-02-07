@@ -71,52 +71,32 @@ for detail on how to build and start the RTMP docker container.
 The projects [Dockerfile](./Dockerfile) will create a docker image that can be used to compile the libraries, compile the ums application or run ums application.
 
 ```bash
-#Build the image
-docker build -t ums .
+# Builder image
+docker build --target base  -t ums-builder .
 
-#Compile the ffmpeg library
-docker run --rm -v $(pwd)/lib/ffmpeg:/ffmpeg ums /bin/sh /ffmpeg/compile.sh
+#Compile the ums application for debugging using the docker image
+docker run --rm --name ums-builder -u $UID -v $(pwd):/source -w /source ums-builder make debug
 
-#Compile the ums application for production
-docker run --rm -v $(pwd):$(pwd) \
-  -e PKG_CONFIG_PATH="./lib/ffmpeg/ffmpeg_build/lib/pkgconfig" \
-  -w $(pwd) ums /usr/bin/make
+#Compile the ums application for production using the docker image
+docker run --rm --name ums-builder -u $UID -v $(pwd):/source -w /source ums-builder make
 
-#Compile the ums application for development
-docker run --rm -v $(pwd):$(pwd) -w $(pwd) ums /usr/bin/make debug
+#Run the ums application in docker container
+docker run --rm --name ums-builder -u $UID -v $(pwd):/source -w /source ums-builder ./ums \
+  --mode live \
+  --rtmpIn rtmp://localhost:1935/testing/test \
+  ...
 
-#Run the ums application in the docker container
-#Application must have been compiled before calling this command
-docker run --rm -v $(pwd):/$(pwd) -w $(pwd)\
- ums ./ums \
-  -rtmpIn rtmp://localhost/live/input \
-  -rtmpOut rtmp://localhost/live/output \
-  -dash ./dash/index.mpd \
-  -rec ./rec/rec.ts \
-  -preFiller ..../english-pre-filler.jpg \
-  -sessionFiller ..../english-session-filler.jpg \
-  -postFiller ..../english-post-filler.jpg
+# Create docker container for production, make sure ums executable and test/dash rtest/rec dirs are empty before creating image
+docker build -t thomaskhub/ums .
+
+# Start the docker container
+docker run --name ums-prod --rm -e mode:live  thomaskhub/ums:latest
 
 ```
 
 # System description
 
-**Work in progress**
 ![System](./doc/images/media-platform-ums.jpg)
-
-- System is connected to an rtmp server
-- the rtmp input is first normalized to 720p with 25fps and YUV420p pixel format
-- then the rtmp input video is sliced into 1 second chunks
-  - 1 seconds chunk to allow easy switching between filler videos and RTMP input as AV sync will be easy to maintain
-- the rtmp inputSwitch.c will read the rtmp chunk buffer and forward the frames to the output modules.
-  - If rtmp input goes down the switch uses preloaded frames from a jpg file instead so that stream never interrupts.
-  - three different fillers are being played depending on the wallclock time and the event configuration
-- the main output module will forward the video files to another RTMP server (16-07-2022 Implemented until here)
-  - it can also optionally store the video chunks in a MPEGTS file
-  - and it also forwards it the the Dash mux
-- As Dash/HLS are ABR protocols each output needs to create different bandwidth and resolutions.
-
-  - x264 encoder is implemented in the output.c file.
 
 # Testing
 
@@ -217,24 +197,6 @@ A summery of what needs to be tested:
 
 - Test dash and hls streams on Isha Shaka player
 - Test Dash / HLS on Mobile phone, laptop, different devices.
-
-- # Implementation Status
-
-  - Live Mode
-    - Dash and HLS output is implemented
-    - RTMP input is implemented which is normalized to 720p, 2888000bps
-    - RTMP output is implemented for 720p stream
-    - MPEG TS recording is implemented for 720p stream
-  - Video On Demand [Not implemented Yet]
-    - [ ] Rename rtmpIn parameter to input and allow it to either specify a MPEGTS
-          recording, or rtmp input stream
-      - MPEGTS file must be processed as fast as possible
-      - Filler video generation can be disabled
-    - [ ] Disable RTMP output and MPEGTS recording for VOD. Only Dash/HLS is needed
-  - Video As Stream [Not implemented Yet]
-    - [ ] as in VOD make sure that we can specify a input MPEGTS recording
-    - [ ] input file must be processed in realtime (see -re parameter in ffmpeg as example)
-    - [ ] Disable RTMP output and MPEGTS recording for VOD. Only Dash/HLS is needed
 
 ```
 

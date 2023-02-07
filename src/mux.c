@@ -25,6 +25,10 @@ int openInput(AVFormatContext **inFmtCtx, char *filename, AVStream **audioStream
     return ret;
   }
 
+  // This print we have added to analyze issue. Depending on OBS config
+  // sometimes video stream is not detected correctly (fixed b setting key frame interval to 2s in OBS)
+  av_log(NULL, AV_LOG_ERROR, "input format --> nb_Streams = %u |\n", (*inFmtCtx)->nb_streams);
+
   *audioStream = NULL;
   *videoStream = NULL;
   // We extract first video and audio other files will not be supported
