@@ -11,7 +11,7 @@ int getFrameFromImage(AVFormatContext **ctx, char *path,
   AVPacket *pkt;
   struct SwsContext *swsCtx;
 
-  ret = openInput(ctx, path, &audioStream, &videoStream, 0, 0);
+  ret = openInput(ctx, path, &audioStream, &videoStream, 0, 0, 0, 1);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "utils::getFrameFromImage::could not open file\n");

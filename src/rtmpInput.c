@@ -84,7 +84,7 @@ void *worker(void *data) {
     avBufferClear(&rtmpInABuffer);
     avBufferClear(&rtmpInVBuffer);
 
-    ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo, 0, 0);
+    ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo, 0, 0, 1, 1);
     if (ret < 0) {
       av_log(NULL, AV_LOG_DEBUG,
              "rtmpInput::Could not open rtmp input %i  url --> %s\n", ret,
