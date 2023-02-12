@@ -47,7 +47,7 @@ int openInput(AVFormatContext **inFmtCtx, char *filename, AVStream **audioStream
     }
   }
 
-  if ((hasAudio && !audioStream) || (hasVideo && !videoStream)) {
+  if ((hasAudio && *audioStream == NULL) || (hasVideo && *videoStream == NULL)) {
     closeInput(inFmtCtx);
     return AVERROR(EIO);
   }
