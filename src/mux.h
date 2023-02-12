@@ -27,7 +27,8 @@
 #include <unistd.h>
 
 int openInput(AVFormatContext **inFmtCtx, char *filename, AVStream **audioStream,
-              AVStream **videoStream, AVInputFormat *fmt, AVDictionary **opts);
+              AVStream **videoStream, AVInputFormat *fmt, AVDictionary **opts,
+              uint8_t hasAudio, uint8_t hasVideo);
 
 void closeInput(AVFormatContext **inFmtCtx);
 
