@@ -23,6 +23,8 @@
 
 #include "config.h"
 
+#define FRAME_CNT 6
+
 typedef struct AvBuffer {
   AVFrame **buffer;
   uint32_t frameCount;
@@ -86,4 +88,7 @@ uint8_t avBufferFull(AvBuffer *buf);
  */
 void avBufferClear(AvBuffer *buf);
 
+int avBufferPush2(AvBuffer *buf, AVFrame *frame);
+uint8_t avBufferFull2(AvBuffer *buf);
+int avBufferPull2(AvBuffer *buf, AVFrame **frame);
 #endif
