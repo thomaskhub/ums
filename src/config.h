@@ -58,6 +58,7 @@ typedef struct {
   uint64_t inputSwitchAFrameCnt;
   int64_t inputSwitchStartTime;
   int64_t mainStartTime;
+  uint8_t dvr;
   const char *rtmpInputStatus;
 } GlobalT;
 

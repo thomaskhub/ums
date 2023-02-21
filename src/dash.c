@@ -1,4 +1,5 @@
 #include "dash.h"
+extern GlobalT global;
 
 static int openDash(DashCtxT *data, AVCodecContext **encoderCtx,
                     AVCodecContext *aCodecCtx) {
@@ -51,7 +52,11 @@ static int openDash(DashCtxT *data, AVCodecContext **encoderCtx,
   av_dict_set(&opts, "use_timeline", "1", 0);
   av_dict_set(&opts, "seg_duration", "4", 0);
   av_dict_set(&opts, "hls_playlist", "1", 0);
-  av_dict_set(&opts, "window_size", "15", 0);
+
+  if (global.dvr == 0) {
+    av_dict_set(&opts, "window_size", "15", 0);
+  }
+
   av_dict_set(&opts, "dash_segment_type", "mp4", 0);
   av_dict_set(&opts, "adaptation_sets", "id=0,streams=v id=1,streams=a", 0);
 

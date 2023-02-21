@@ -299,6 +299,8 @@ void *worker(void *data) {
               goto freeAll;
             }
 
+            // we can push here because we checked before that we have at least
+            // one free space so this should never fail.
             ret = avBufferPush(&rtmpInVBuffer, videoOutFrame);
             if (ret < 0) {
               av_log(NULL, AV_LOG_DEBUG,

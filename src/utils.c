@@ -365,11 +365,11 @@ void rescaleVideoFrame(AVFrame *frame) {
   frame->pkt_duration = av_rescale(frame->pkt_duration, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
 }
 
-void rescaleAudioFrame(AVFrame *frame) {
-  frame->pts = av_rescale(frame->pts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
-  frame->pkt_dts = av_rescale(frame->pkt_dts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
-  frame->pkt_duration = av_rescale(frame->pkt_duration, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
-}
+// void rescaleAudioFrame(AVFrame *frame) {
+//   frame->pts = av_rescale(frame->pts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+//   frame->pkt_dts = av_rescale(frame->pkt_dts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+//   frame->pkt_duration = av_rescale(frame->pkt_duration, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+// }
 
 void setAudioDelay(AVFilterGraph *graph, uint32_t delay) {
   char args[128];

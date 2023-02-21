@@ -54,7 +54,7 @@ int getNextVideoFrame(AVFrame **vFrame) {
 
   if (checkRtmp()) {
 
-    ret = avBufferPull(&rtmpInVBuffer, &tmpFrame);
+    ret = avBufferPull(&rtmpInVBuffer, &tmpFrame); // do not forget to free the frame later
     if (ret < 0 && ret != AVERROR(EAGAIN)) {
       av_log(NULL, AV_LOG_FATAL, "inputSwitch::rtmp video buffer unknown error\n");
       exit(1);
@@ -68,7 +68,7 @@ int getNextVideoFrame(AVFrame **vFrame) {
     return 0;
   } else {
     *vFrame = getFillerVideoFrame();
-    return 0;
+    return 1;
   }
 }
 
@@ -86,7 +86,7 @@ int getNextAudioFrame(AVFrame **aFrame) {
 
   if (checkRtmp()) {
 
-    ret = avBufferPull(&rtmpInABuffer, &tmpFrame);
+    ret = avBufferPull(&rtmpInABuffer, &tmpFrame); // do not forget to free the frame later
     if (ret < 0 && ret != AVERROR(EAGAIN)) {
       av_log(NULL, AV_LOG_FATAL, "inputSwitch::rtmp video buffer unknown error\n");
       exit(1);
@@ -102,7 +102,7 @@ int getNextAudioFrame(AVFrame **aFrame) {
   } else {
     // rtmp is not running so push filler instead
     *aFrame = filler.audioFiller;
-    return 0;
+    return 1;
   }
 }
 
@@ -115,9 +115,10 @@ int getNextAudioFrame(AVFrame **aFrame) {
 uint64_t handleVideoFrames(int64_t *nextVideoPTS) {
   AVFrame *frame;
   int64_t now = getTime();
+  int ret = 0;
 
   if (*nextVideoPTS <= now) {
-    if (getNextVideoFrame(&frame) >= 0) {
+    if ((ret = getNextVideoFrame(&frame)) >= 0) {
       frame->pts = *nextVideoPTS;
       frame->pkt_dts = *nextVideoPTS;
       frame->best_effort_timestamp = *nextVideoPTS;
@@ -138,17 +139,19 @@ uint64_t handleVideoFrames(int64_t *nextVideoPTS) {
  */
 uint64_t handleAudioFrames(int64_t *nextAudioPTS) {
   AVFrame *frame;
+  int ret = 0;
   int64_t now = getTime();
   if (*nextAudioPTS <= now) {
-    if (getNextAudioFrame(&frame) >= 0) {
+    if ((ret = getNextAudioFrame(&frame)) >= 0) {
+      int frameDuration = AFRAME_DURATION(frame->nb_samples);
       frame->pts = *nextAudioPTS;
       frame->pkt_dts = *nextAudioPTS;
       frame->best_effort_timestamp = *nextAudioPTS;
-      frame->pkt_duration = AFRAME_DURATION;
+      frame->pkt_duration = frameDuration;
       aPush(frame);
 
       // set the next sample point
-      *nextAudioPTS += AFRAME_DURATION;
+      *nextAudioPTS += frameDuration;
       global.inputSwitchAFrameCnt += AUDIO_NB_SAMPLES;
     }
   }
