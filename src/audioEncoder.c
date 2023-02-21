@@ -41,7 +41,7 @@ int audioEncoderRun(AudioEncCtx *ctx) {
 
   ret = avcodec_send_frame(ctx->encCtx, ctx->frame);
   if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "audioEncoder::frame copy to encoder failed\n");
+    av_log(NULL, AV_LOG_ERROR, "audioEncoder::frame copy to encoder failed, %i\n", ret);
     if (ret == AVERROR(EAGAIN)) {
       return ret;
     }
