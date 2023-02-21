@@ -102,10 +102,11 @@ OutputCtxT vOutCfg[] = {
      .outWidth = 384,
      .outHeight = 216,
      .type = AVMEDIA_TYPE_VIDEO},
-    {.bitrate = 50000,
+    {.bitrate = 40000,
      .outWidth = 256,
      .outHeight = 144,
      .type = AVMEDIA_TYPE_VIDEO},
+
 };
 
 AudioEncCtx aOutCfg = {.bitrate = 64000};
@@ -159,7 +160,6 @@ void *_statsWorker(void *args) {
 
     char payload[2048];
     sprintf(payload, "{\"cmd\":\"update\",\"payload\":{\"sessionId\":\"%s\",\"fps\":\"%f\",\"sampleRate\":\"%f\", \"rtmpInputStatus\":\"%s\"}}", getenv("sessionId"), inputSwitchFps, inputSwitchSR, global.rtmpInputStatus);
-
 
     message.payload = payload;
     message.payloadlen = strlen(payload);
@@ -324,16 +324,16 @@ int validateInput() {
     return -1;
   }
 
-    printf("Dash manifest path --> %s\n", dashPath);
-    strcpy(tmpString, dashPath);
-    // dirname(tmpString);
-    dir = opendir(tmpString);
-    if (!dir) {
-      // closedir(dir);
-      printf("Error: dash output directory cannot be opened %s\n", tmpString);
-      return -1;
-    }
-    closedir(dir);
+  printf("Dash manifest path --> %s\n", dashPath);
+  strcpy(tmpString, dashPath);
+  // dirname(tmpString);
+  dir = opendir(tmpString);
+  if (!dir) {
+    // closedir(dir);
+    printf("Error: dash output directory cannot be opened %s\n", tmpString);
+    return -1;
+  }
+  closedir(dir);
 
   printf("Dash manifest path --> %s\n", dashPath);
   strcpy(tmpString, dashPath);
@@ -390,6 +390,7 @@ int main(int argc, char **argv) {
     doorOpen = getenv("doorOpen");
     sessionStart = getenv("sessionStart");
     sessionEnd = getenv("sessionEnd");
+    global.dvr = getenv("dvr") == NULL ? 0 : 1;
 
   } else {
 
@@ -511,7 +512,8 @@ int main(int argc, char **argv) {
   dashCtx.streamLen = cfgLength;
   ret = startDash(&dashCtx, dashCodecList, aOutCfg.encCtx);
   if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "main::could not start dash output...");
+    av_log(NULL, AV_LOG_ERROR, "main::could not start dash output... %i\n", ret);
+    exit(1);
   }
 
   ret = inputSwitchInit(switchPushVFrame, switchPushAFrame, rtmpIsRunning,

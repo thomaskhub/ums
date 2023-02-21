@@ -1,5 +1,9 @@
 #include "avBuffer.h"
 
+// the pull2, full2, xxxx2 etc. functions have been tested but did not end up
+// in production. We thought the normal buffer has some issues but it was not so.
+// both of them are working. difference is that after calling avBufferPull2 is called
+// the returned frame must be freed by the caller to avoid memory leaks.
 int addAudioSlice(AvBuffer *buf, AVFrame *frame) {
   AVFrame *slice;
   int ret;
@@ -86,7 +90,7 @@ int avBufferPush2(AvBuffer *buf, AVFrame *frame) {
   }
 
   if (avBufferFull2(buf)) {
-    av_log(NULL, AV_LOG_WARNING, "avBufferPush2::%s buffer is full\n");
+    av_log(NULL, AV_LOG_WARNING, "avBufferPush2::buffer is full\n");
     return AVERROR(EAGAIN);
   }
 
@@ -110,16 +114,6 @@ uint8_t avBufferFull2(AvBuffer *buf) {
   return (buf->wrPtr + 1) % FRAME_CNT == buf->rdPtr;
 }
 
-/**
- * @brief pull a frame from the buffer
- * its important that the application call av_frame_free
- * on the returned frame after its not needed so that memory
- * is released
- *
- * @param buf
- * @param frame
- * @return int
- */
 int avBufferPull2(AvBuffer *buf, AVFrame **frame) {
   uint8_t empty = buf->wrPtr == buf->rdPtr;
   // av_log(NULL, AV_LOG_ERROR, "avBufferPull2::try to pull\n");
@@ -209,11 +203,11 @@ int avBufferPush(AvBuffer *buf, AVFrame *frame) {
   // this way the first frame will decide the buffer frame settings
   if (!buf->buffer) {
     if (buf->type == AVMEDIA_TYPE_VIDEO) {
-      ret = avBufferInit(buf, 3, frame->format, frame->width, frame->height, 0,
+      ret = avBufferInit(buf, 6, frame->format, frame->width, frame->height, 0,
                          0, 0, AVMEDIA_TYPE_VIDEO);
 
     } else if (buf->type == AVMEDIA_TYPE_AUDIO) {
-      ret = avBufferInit(buf, 3, 0, 0, 0, frame->format, frame->nb_samples,
+      ret = avBufferInit(buf, 6, 0, 0, 0, frame->format, frame->nb_samples,
                          frame->channel_layout, AVMEDIA_TYPE_AUDIO);
     }
 
