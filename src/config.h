@@ -1,65 +1,60 @@
-/**
-* Copyright (C) 2022  The World
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
+#ifndef __CONFIG__
+#define __CONFIG__
+#include <iostream>
 
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
-* USA.
-*/
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+#include <libavutil/frame.h>
+#include <libavutil/log.h>
+#include <libavutil/opt.h>
+#include <libavutil/samplefmt.h>
+}
 
-#ifndef __MEDIA_CONFIG___
-#define __MEDIA_CONFIG___
+class Config {
+private:
+public:
+  const char *primaryInput = std::getenv("primaryInput");
+  const char *rtmpSecondaryInput = std::getenv("rtmpSecondaryInput");
+  const char *outputUrl = std::getenv("outputUrl");
+  const char *fillerJpg = std::getenv("fillerJpg");
+  bool dvrEnabled = std::getenv("dvr") ? true : false;
+  bool debug = std::getenv("debug") ? true : false;
+  int logLevel = std::getenv("loglevel") ? std::stoi(std::getenv("loglevel")) : AV_LOG_ERROR;
 
-#include "filters.h"
-#include <math.h>
+  Config() {
+    av_log_set_level(logLevel);
+  }
 
-#define VIDEO_WIDTH 1280
-#define VIDEO_HEIGHT 720
-#define VIDEO_FRAME_RATE 25
-#define VIDEO_TIMEBASE_NUM 1
-#define VIDEO_TIMEBASE_DEN 12800
-#define AUDIO_TIMEBASE_NUM 1
+  bool validateInput();
+  bool isDvrEnabled() { return dvrEnabled; }
 
-#define VIDEO_PIX_FMT AV_PIX_FMT_YUV420P
-#define AUDIO_SAMPLE_FMT AV_SAMPLE_FMT_FLTP
-#define AUDIO_NB_SAMPLES 1024
-#define AUDIO_RATE 44100
-#define AUDIO_CH_LAYOUT AV_CH_LAYOUT_MONO
+  // Some static config variables
+  static const int VIDEO_PIX_FMT = AV_PIX_FMT_YUV420P;
+  static const int VIDEO_WIDTH = 1280;
+  static const int VIDEO_HEIGHT = 720;
+  static const int AUDIO_SAMPLE_FMT = AV_SAMPLE_FMT_FLTP;
+  static const int AUDIO_NB_SAMPLES = 1024;
+  static const int AUDIO_CH_LAYOUT = AV_CH_LAYOUT_MONO;
+  static const int AUDIO_RATE = 44100;
+  const AVRational TIMEBASE = {.num = 1, .den = 1000000};
 
-#define FILLER_VIDEO_FILTER "scale=1280:720,format=yuv420p"
-#define RTMPIN_VIDEO_FILTER "scale=1280:720,format=yuv420p,fps=fps=25"
-#define RTMPIN_AUDIO_FILTER "aresample=44100,asetnsamples=n=1024:p=0,aformat=channel_layouts=mono,volume=1"
+  // #define VIDEO_FRAME_RATE 25
+  // #define VIDEO_TIMEBASE_NUM 1
+  // #define VIDEO_TIMEBASE_DEN 12800
+  // #define AUDIO_TIMEBASE_NUM 1
 
-#define TIMEBASE_NUM 1
-#define TIMEBASE_DEN 1000000
-#define VFRAME_DURATION 1000000 / 25
-#define AFRAME_DURATION(samples) ceil(1000000.0 * samples / 44100.0)
+  // #define VIDEO_PIX_FMT AV_PIX_FMT_YUV420P
+  // #define AUDIO_CH_LAYOUT AV_CH_LAYOUT_MONO
 
-/**
- * @brief Variable containing all global objects like statistics or
- * things to control filters etc.
- *
- */
-typedef struct {
-  UmsAvFilter *audioFilter;
-  UmsAvFilter *videoFilter;
-  const char *test;
-  uint64_t inputSwitchVFrameCnt;
-  uint64_t inputSwitchAFrameCnt;
-  int64_t inputSwitchStartTime;
-  int64_t mainStartTime;
-  uint8_t dvr;
-  const char *rtmpInputStatus;
-} GlobalT;
+  // #define FILLER_VIDEO_FILTER "scale=1280:720,format=yuv420p"
+  // #define RTMPIN_VIDEO_FILTER "scale=1280:720,format=yuv420p,fps=fps=25"
+  // #define RTMPIN_AUDIO_FILTER "aresample=44100,asetnsamples=n=1024:p=0,aformat=channel_layouts=mono,volume=1"
+
+  // #define TIMEBASE_NUM 1
+  // #define TIMEBASE_DEN 1000000
+  // #define VFRAME_DURATION 1000000 / 25
+  // #define AFRAME_DURATION(samples) ceil(1000000.0 * samples / 44100.0)
+};
 
 #endif

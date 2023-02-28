@@ -19,9 +19,7 @@
 #ifndef __UTILS__
 #define __UTILS__
 
-extern "C" {
 #include <dirent.h>
-#include <libavcodec/avcodec.h>
 #include <libavformat/avformat.h>
 #include <libavutil/mathematics.h>
 #include <libavutil/rational.h>
@@ -29,10 +27,9 @@ extern "C" {
 #include <libgen.h>
 #include <string.h>
 #include <time.h>
-}
 
-// #include "config.h"
-// #include "mux.h"
+#include "config.h"
+#include "mux.h"
 
 /**
  * @brief Get the Frame From Image object
@@ -46,8 +43,9 @@ extern "C" {
 int getFrameFromImage(AVFormatContext **ctx, char *path,
                       AVFrame **pictureFrame);
 
-int getEmptyVideoFrame(AVFrame **frame, int pixFmt, int width, int height);
-int getEmptyAudioFrame(AVFrame **frame, enum AVSampleFormat smpFmt, int nbSamples, uint64_t channelLayout, uint32_t sampleRate);
+int getEmptyAvFrame(AVFrame **frame, int pixFmt, int width, int height,
+                    enum AVSampleFormat smpFmt, int nbSamples,
+                    uint64_t channelLayout, enum AVMediaType type);
 
 /**
  * @brief take a YUV420P video frame and store it into a jpeg
@@ -113,5 +111,13 @@ uint8_t fileExists(const char *path);
 double movingAverage(int64_t *data, uint8_t periods, int64_t value);
 double movingAverageDouble(double *data, uint8_t periods, double value);
 void rescaleVideoFrame(AVFrame *frame);
+
+/**
+ * @brief Set the Audio Delay in the filter for AV sync if needed
+ *
+ * @param graph
+ * @param delay
+ */
+void setAudioDelay(AVFilterGraph *graph, uint32_t delay);
 
 #endif

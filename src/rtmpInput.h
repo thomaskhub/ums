@@ -1,62 +1,95 @@
-/**
-* Copyright (C) 2022  The World
-*
-* This program is free software; you can redistribute it and/or
-* modify it under the terms of the GNU General Public License
-* as published by the Free Software Foundation; either version 2
-* of the License, or (at your option) any later version.
-*
-* This program is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-* GNU General Public License for more details.
+#ifndef ___RTMP__INPUT__
+#define ___RTMP__INPUT__
 
-* You should have received a copy of the GNU General Public License
-* along with this program; if not, write to the Free Software
-* Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301,
-* USA.
-*/
-#ifndef __RTMP_INPUT__
-#define __RTMP_INPUT__
-
-#include <libavutil/frame.h>
-#include <libavutil/samplefmt.h>
-#include <pthread.h>
-
-#include "avBuffer.h"
-#include "config.h"
-#include "filters.h"
-#include "mux.h"
+#include "input.h"
 #include "utils.h"
-typedef struct {
-  int audioSampleRate;
-  uint64_t audioChannelLayout;
-  int audioChannels;
-  int audioSampleFormat;
-  AVRational audioTimeBase;
-} RtmpInputInfo;
+#include <unistd.h>
 
-AvBuffer rtmpInVBuffer;
-AvBuffer rtmpInABuffer;
+#include "decoder.h"
+#include "encoder.h"
+#include <functional>
 
-typedef struct {
-  char *url;
-  void (*audioCallback)(AVFrame *frame, AVRational framerate);
-  void (*videoCallback)(AVFrame *frame, AVRational framerate);
-} RtmpWorkerData;
+#define RTMP_WAIT_INPUT 0
+#define RTMP_RUNNING 1
+#define RTMP_STOPPED 2
+#define RTMP_RETRY 3
+class RtmpInput : public Input, public Decoder {
+private:
+  const std::string AUDIO_FILTER = "aresample=44100,asetnsamples=n=1024:p=0,aformat=channel_layouts=mono,volume=1";
+  const std::string VIDEO_FILTER = "scale=1280:720,format=yuv420p,fps=fps=25";
 
-void rtmpInputStart(char *url);
-void rtmpInputStop();
-void rtmpInputJoin();
-AVRational rtmpGetVideoTimebase();
-AVRational rtmpGetAudioTimebase();
+  pthread_t inputThread;
+  int state;
+  bool runThread;
 
-/**
- * @brief function to get the rtmp input status
- * 1 means its running, 0 means its not running
- *
- * @return int
- */
-int rtmpIsRunning();
+  /**
+   * Input audio and video decoders
+   */
+  Decoder *videoDecoder;
+  Decoder *audioDecoder;
+  AVCodecContext *audioDecCtx;
+  AVCodecContext *videoDecCtx;
+  AVFrame *videoOutFrame;
+  AVFrame *audioOutFrame;
+  AVPacket rtmpPacket;
+
+  /**
+   * @brief pthread worker to ensure auto recovery when input connection
+   * is lost. It is responsible of RTMP packet/frame processing
+   */
+  static void *worker(void *data);
+
+  /**
+   * @brief Open the audio and video decoders and preparing them for
+   * processing RTMP data
+   *
+   * @return int
+   */
+  int openDecoders();
+
+  int init();
+
+public:
+  Encoder *videoEncoder; // TODO: this should be replaced with buffer
+
+  RtmpInput(std::string url, AVDictionary *opts) : Input(url, opts) {
+    this->videoDecoder = new Decoder();
+    this->audioDecoder = new Decoder();
+  };
+  ~RtmpInput() {
+    this->stop();
+
+    delete this->videoDecoder;
+    delete this->audioDecoder;
+  }
+
+  /**
+   * @brief Start the RTMP input, connects to the specified URL in the
+   * constructor and starts processing incoming media data.
+   *
+   * @return int
+   */
+  int run();
+
+  /**
+   * @brief Stop the internal worker thread which will free all resources
+   * and stop the RTMP input completely
+   *
+   */
+  void stop();
+
+  /**
+   * @brief Needs to be called to wait for the worker thread to finish processing
+   *
+   */
+  void join();
+
+  /**
+   * @brief Needs to be called to start RTMP packet processing
+   *
+   * @return int
+   */
+  int processLoop();
+};
 
 #endif

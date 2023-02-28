@@ -316,6 +316,13 @@ void cleanDashDir(const char *path) {
   strcat(cmd, path);
   strcat(cmd, "/*.m3u8 > /dev/null");
   system(cmd);
+
+  // delete the tmp  files
+  cmd[0] = 0;
+  strcat(cmd, "exec rm -r ");
+  strcat(cmd, path);
+  strcat(cmd, "/*.tmp > /dev/null");
+  system(cmd);
 }
 
 int mkdirP(const char *path) {
