@@ -79,6 +79,9 @@ int RtmpInput::init() {
   return 0;
 }
 
+std::ofstream vLog("/tmp/audio.txt");
+std::ofstream aLog("/tmp/video.txt");
+
 int RtmpInput::processLoop() {
   int ret;
 
@@ -117,11 +120,16 @@ int RtmpInput::processLoop() {
 
         ret = this->audioDecoder->sendPacket(&rtmpPacket, &audioOutFrame);
 
+        aLog << "PTS: " << audioOutFrame->pts << " " << audioOutFrame->time_base.den << " | " << audioOutFrame->time_base.num << std::endl;
+
         if (ret < 0 && ret != AVERROR(EAGAIN)) {
           this->stop();
           break;
         };
 
+        if (ret == 0) {
+          this->inputSwitch->pushAudio(audioOutFrame, this->inputId);
+        }
         av_frame_unref(this->audioOutFrame);
 
       } else if (rtmpPacket.stream_index == this->Input::videoStream->index) {
@@ -132,8 +140,10 @@ int RtmpInput::processLoop() {
           break;
         };
 
+        vLog << "PTS: " << videoOutFrame->pts << " " << videoOutFrame->time_base.den << " | " << audioOutFrame->time_base.num << std::endl;
+
         if (ret == 0) {
-          this->videoEncoder->push(this->videoOutFrame);
+          this->inputSwitch->pushVideo(videoOutFrame, this->inputId);
         }
         av_frame_unref(this->videoOutFrame);
       }

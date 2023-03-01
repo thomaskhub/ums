@@ -12,28 +12,48 @@ extern "C" {
 #include <libavutil/opt.h>
 #include <libavutil/samplefmt.h>
 }
+
+#define OUTPUT_MODE_RTMP 0
+#define OUTPUT_MODE_MPEGTS 1
+#define OUTPUT_MODE_DASH 2
+
+struct OutputConfig {
+  const AVCodecContext *codecContext;
+};
+
 class Output {
 public:
   std::string filename;
-  AVDictionary *opts;
   AVFormatContext *fmtCtx;
-  AVStream *audioStream;
-  AVStream *videoStream;
+  int codecContLength;
+  int videoCnt;
+  int audioCnt;
+  AVStream *ouputStreams[12]; // max 12 streams allowed
   std::string formatName;
+  OutputConfig *config;
+  int cfgLength;
+
+  int createStreams();
 
 public:
-  Output(std::string filename, std::string formatName, AVDictionary *opts) {
+  Output(std::string filename, OutputConfig *config, int length, int mode) {
     this->filename = filename;
-    this->formatName = formatName;
-    this->opts = opts;
+    this->config = config;
+    this->cfgLength = length;
+
+    if (mode == OUTPUT_MODE_RTMP) {
+      this->formatName = "flv";
+    } else if (mode == OUTPUT_MODE_MPEGTS) {
+      this->formatName = "mpegts";
+    } else if (mode == OUTPUT_MODE_DASH) {
+      this->formatName = "dash";
+    }
   };
 
   int open();
   void close();
 
-  int pushAudio(AVPacket *packet, int idx);
-  int pushVideo(AVPacket *packet, int idx);
-  void writeHeader();
+  int push(AVPacket *packet, int idx);
 };
 
 #endif

@@ -10,7 +10,7 @@ CXXFLAGS := $(shell pkg-config --cflags $(FFMPEG_LIBS)) $(CFLAGS)
 LDLIBS := $(shell pkg-config --libs $(FFMPEG_LIBS)) $(LDLIBS)
 
 OBJECTS := src/main.cpp src/config.cpp src/input.cpp  src/rtmpInput.cpp src/decoder.cpp src/filter.cpp src/utils.cpp  \
-			src/encoder.cpp src/output.cpp
+			src/encoder.cpp src/output.cpp src/inputSwitch.cpp
 
 all: 
 	$(CXX) $(OBJECTS) -Wno-deprecated-declarations -o ums $(CXXFLAGS) $(LDLIBS) \

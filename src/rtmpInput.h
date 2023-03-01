@@ -7,6 +7,7 @@
 
 #include "decoder.h"
 #include "encoder.h"
+#include "inputSwitch.h"
 #include <functional>
 
 #define RTMP_WAIT_INPUT 0
@@ -15,6 +16,9 @@
 #define RTMP_RETRY 3
 class RtmpInput : public Input, public Decoder {
 private:
+  InputSwitch *inputSwitch;
+  int inputId;
+
   const std::string AUDIO_FILTER = "aresample=44100,asetnsamples=n=1024:p=0,aformat=channel_layouts=mono,volume=1";
   const std::string VIDEO_FILTER = "scale=1280:720,format=yuv420p,fps=fps=25";
 
@@ -50,8 +54,6 @@ private:
   int init();
 
 public:
-  Encoder *videoEncoder; // TODO: this should be replaced with buffer
-
   RtmpInput(std::string url, AVDictionary *opts) : Input(url, opts) {
     this->videoDecoder = new Decoder();
     this->audioDecoder = new Decoder();
@@ -90,6 +92,11 @@ public:
    * @return int
    */
   int processLoop();
+
+  void setInputSwitch(InputSwitch *input, int inputId) {
+    this->inputId = inputId;
+    this->inputSwitch = input;
+  }
 };
 
 #endif

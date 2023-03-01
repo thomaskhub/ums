@@ -1,7 +1,31 @@
 #include "output.h"
 
+int Output::createStreams() {
+  int ret = 0;
+  int i = 0;
+
+  for (i = 0; i < this->cfgLength; i++) {
+    this->ouputStreams[i] = avformat_new_stream(this->fmtCtx, NULL);
+    if (!this->ouputStreams[i]) {
+      this->close();
+      return AVERROR(EINVAL);
+    }
+
+    ret = avcodec_parameters_from_context(this->ouputStreams[i]->codecpar,
+                                          this->config[i].codecContext);
+
+    if (ret < 0) {
+      av_log(NULL, AV_LOG_ERROR, "output::could not set codecpar\n");
+      this->close();
+      return ret;
+    }
+  }
+
+  return ret;
+}
+
 int Output::open() {
-  int ret;
+  int ret = 0;
 
   ret = avformat_alloc_output_context2(&this->fmtCtx, NULL, "mpegts",
                                        this->filename.c_str());
@@ -14,17 +38,10 @@ int Output::open() {
     return AVERROR(ENOMEM);
   }
 
-  this->videoStream = avformat_new_stream(this->fmtCtx, NULL);
-  if (!this->videoStream) {
-    this->close();
-    return AVERROR(ENOMEM);
+  ret = this->createStreams();
+  if (ret < 0) {
+    return ret;
   }
-
-  // this->audioStream = avformat_new_stream(this->fmtCtx, NULL);
-  // if (!this->audioStream) {
-  //   this->close();
-  //   return AVERROR(ENOMEM);
-  // }
 
   if (!(this->fmtCtx->flags & AVFMT_NOFILE)) {
     ret = avio_open(&(this->fmtCtx)->pb, this->filename.c_str(), AVIO_FLAG_WRITE);
@@ -34,6 +51,12 @@ int Output::open() {
     }
   }
 
+  ret = avformat_write_header(this->fmtCtx, NULL);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "open output::could not write header\n");
+    this->close();
+  }
+
   return 0;
 }
 
@@ -41,34 +64,28 @@ void Output::close() {
   avformat_free_context(this->fmtCtx);
 }
 
-int Output::pushAudio(AVPacket *packet, int idx) {
-}
-
-int tmp = 0;
-int Output::pushVideo(AVPacket *packet, int idx) {
+int Output::push(AVPacket *packet, int idx) {
 
   AVPacket *recPacket;
   int ret;
 
   recPacket = av_packet_clone(packet);
   AVRational timebase = Config().TIMEBASE;
-  recPacket->dts = tmp + 40000;
-  recPacket->pts = tmp + 40000;
-  tmp += 40000;
+  recPacket->stream_index = idx;
 
-  // av_packet_rescale_ts(recPacket, timebase, this->videoStream->time_base);
-  recPacket->stream_index = 0;
-  // std::cout << "here 5" << std::endl;
-  ret = av_interleaved_write_frame(this->fmtCtx, recPacket);
-  // std::cout << "----------------------------" << ret << std::endl;
-  av_packet_unref(recPacket);
-  // std::cout << "here 6" << std::endl;
-}
-
-void Output::writeHeader() {
-  int ret = avformat_write_header(this->fmtCtx, NULL);
-  if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "open output::could not write header\n");
-    this->close();
+  av_packet_rescale_ts(recPacket, timebase, this->ouputStreams[idx]->time_base);
+  if (idx == 0) {
+    std::cout << "timebase --> " << timebase.num << " | " << timebase.den << std::endl;
+    std::cout << "timebase stream --> " << this->ouputStreams[idx]->time_base.num << " | " << this->ouputStreams[idx]->time_base.den << std::endl;
+    std::cout << "Packet PTS --> " << packet->pts << " | " << recPacket->pts << std::endl;
+    std::cout << "Packet DTS --> " << packet->dts << " | " << recPacket->dts << std::endl;
   }
+  ret = av_interleaved_write_frame(this->fmtCtx, recPacket);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "output::could not write packet to file\n");
+  }
+
+  av_packet_unref(recPacket);
+
+  return 0;
 }

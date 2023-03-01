@@ -1,6 +1,14 @@
 #include "encoder.h"
 
-void Encoder::initAudio() {}
+void Encoder::initAudio() {
+  this->ctx->bit_rate = this->config.bitrate;
+  this->ctx->rc_buffer_size = this->config.bitrate;
+  this->ctx->rc_max_rate = this->config.bitrate;
+  this->ctx->sample_fmt = (AVSampleFormat)this->config.sampleFormat;
+  this->ctx->sample_rate = this->config.sampleRate;
+  this->ctx->channel_layout = this->config.channelLayout;
+  this->ctx->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
+}
 
 void Encoder::initVideo() {
   int ret;
@@ -63,6 +71,15 @@ int Encoder::init() {
   ret = avcodec_open2(this->ctx, this->codec, NULL);
   if (ret < 0) {
     avcodec_free_context(&this->ctx);
+    return ret;
+  }
+
+  this->packet = av_packet_alloc();
+  if (!this->packet) {
+    ret = AVERROR(ENOMEM);
+    av_log(NULL, AV_LOG_ERROR, "audioEncoderInit:: allocate packet failed\n");
+    avcodec_free_context(&this->ctx);
+    return ret;
   }
 
   return ret;
@@ -80,8 +97,6 @@ int Encoder::push(AVFrame *frame) {
   // std::cout << "Encoder Packcet Duration:" << frame->pkt_duration << std::endl;
   // std::cout << "Encoder Packcet Size:" << frame->pkt_size << std::endl;
 
-  frame->pkt_dts = frame->pts;
-
   // run through encoder
   ret = avcodec_send_frame(this->ctx, frame);
   if (ret < 0) {
@@ -89,19 +104,20 @@ int Encoder::push(AVFrame *frame) {
     exit(1); // TODO: can we handle this more gracefully?
   }
 
-  if (this->config.type == AVMEDIA_TYPE_VIDEO) {
-    while (ret >= 0) {
-      ret = avcodec_receive_packet(this->ctx, packet);
-      if (ret < 0) {
-        // if (ret == AVERROR(EAGAIN)) {
-        break;
-      }
-      output->pushVideo(packet, 0);
-      av_packet_unref(packet);
+  while (ret >= 0) {
+    ret = avcodec_receive_packet(this->ctx, this->packet);
+    if (ret < 0) {
+      break;
     }
 
-    return 0;
+    for (int i = 0; i < this->outputCnt; i++) {
+      this->outputs[i].output->push(this->packet, this->outputs[i].index);
+    }
+    // encoder is the owner of the packet. Output must copy it if it needs
+    // its own reference to it.
+    av_packet_unref(this->packet);
   }
+  return 0;
 }
 
 int Encoder::pull(AVPacket **packet) { return 0; }
