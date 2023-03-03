@@ -19,8 +19,10 @@ private:
   InputSwitch *inputSwitch;
   int inputId;
 
-  const std::string AUDIO_FILTER = "aresample=44100,asetnsamples=n=1024:p=0,aformat=channel_layouts=mono,volume=1";
-  const std::string VIDEO_FILTER = "scale=1280:720,format=yuv420p,fps=fps=25";
+  // const std::string AUDIO_FILTER = "aresample=44100,asetnsamples=n=1024:p=0,aformat=channel_layouts=mono,volume=1";
+  const std::string AUDIO_FILTER = "aresample=44100,aformat=channel_layouts=mono";
+  // const std::string VIDEO_FILTER = "scale=1280:720,format=yuv420p,fps=fps=25";
+  const std::string VIDEO_FILTER = "scale=1280:720,format=yuv420p";
 
   pthread_t inputThread;
   int state;
@@ -52,6 +54,10 @@ private:
   int openDecoders();
 
   int init();
+
+  int getStartTime() {
+    return std::max(this->videoStream->start_time, this->audioStream->start_time);
+  }
 
 public:
   RtmpInput(std::string url, AVDictionary *opts) : Input(url, opts) {

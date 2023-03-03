@@ -6,10 +6,13 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/frame.h>
 #include <libavutil/log.h>
+#include <libavutil/opt.h>
 #include <libavutil/samplefmt.h>
 }
 
+#include "config.h"
 #include "filter.h"
+#include <fstream>
 
 class Decoder {
   bool isFirstFrame = true;

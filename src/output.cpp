@@ -74,12 +74,7 @@ int Output::push(AVPacket *packet, int idx) {
   recPacket->stream_index = idx;
 
   av_packet_rescale_ts(recPacket, timebase, this->ouputStreams[idx]->time_base);
-  if (idx == 0) {
-    std::cout << "timebase --> " << timebase.num << " | " << timebase.den << std::endl;
-    std::cout << "timebase stream --> " << this->ouputStreams[idx]->time_base.num << " | " << this->ouputStreams[idx]->time_base.den << std::endl;
-    std::cout << "Packet PTS --> " << packet->pts << " | " << recPacket->pts << std::endl;
-    std::cout << "Packet DTS --> " << packet->dts << " | " << recPacket->dts << std::endl;
-  }
+
   ret = av_interleaved_write_frame(this->fmtCtx, recPacket);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "output::could not write packet to file\n");

@@ -88,16 +88,7 @@ int Encoder::init() {
 int Encoder::push(AVFrame *frame) {
   int ret;
   AVPacket *packet;
-  // std::cout << "" << std::endl;
-  // std::cout << "" << std::endl;
-  // std::cout << "" << std::endl;
-  // std::cout << "Encoder PTS:" << frame->pts << std::endl;
-  // std::cout << "Encoder Packcet DTS:" << frame->pkt_dts << std::endl;
-  // std::cout << "Encoder Packcet Pos:" << frame->pkt_pos << std::endl;
-  // std::cout << "Encoder Packcet Duration:" << frame->pkt_duration << std::endl;
-  // std::cout << "Encoder Packcet Size:" << frame->pkt_size << std::endl;
 
-  // run through encoder
   ret = avcodec_send_frame(this->ctx, frame);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR, "output::Could not copy frame to encoder %i\n", ret);
@@ -110,6 +101,7 @@ int Encoder::push(AVFrame *frame) {
       break;
     }
 
+    this->packet->time_base = AV_TIME_BASE_Q;
     for (int i = 0; i < this->outputCnt; i++) {
       this->outputs[i].output->push(this->packet, this->outputs[i].index);
     }

@@ -56,6 +56,9 @@ int RtmpInput::openDecoders() {
   return ret;
 }
 
+std::ofstream rtmpVLog("/tmp/rtmpVideoOut.txt");
+std::ofstream rtmpALog("/tmp/rtmpAudioOut.txt");
+
 int RtmpInput::init() {
   int ret;
   ret = getEmptyVideoFrame(
@@ -79,9 +82,6 @@ int RtmpInput::init() {
   return 0;
 }
 
-std::ofstream vLog("/tmp/audio.txt");
-std::ofstream aLog("/tmp/video.txt");
-
 int RtmpInput::processLoop() {
   int ret;
 
@@ -103,7 +103,7 @@ int RtmpInput::processLoop() {
       sleep(3);
       continue;
     }
-    std::cout << "Thomas try to open the decoders " << std::endl;
+
     if (this->openDecoders() < 0) {
       continue;
     }
@@ -117,10 +117,13 @@ int RtmpInput::processLoop() {
       }
 
       if (rtmpPacket.stream_index == this->Input::audioStream->index) {
-
         ret = this->audioDecoder->sendPacket(&rtmpPacket, &audioOutFrame);
 
-        aLog << "PTS: " << audioOutFrame->pts << " " << audioOutFrame->time_base.den << " | " << audioOutFrame->time_base.num << std::endl;
+        if (audioOutFrame->best_effort_timestamp < this->getStartTime()) {
+          av_frame_unref(audioOutFrame);
+          continue; // read the nect packet and drop this frame until we
+                    // reache the start
+        }
 
         if (ret < 0 && ret != AVERROR(EAGAIN)) {
           this->stop();
@@ -128,21 +131,25 @@ int RtmpInput::processLoop() {
         };
 
         if (ret == 0) {
+          rtmpALog << audioOutFrame->pts << "," << audioOutFrame->pkt_dts << "," << audioOutFrame->best_effort_timestamp << "," << audioOutFrame->pkt_duration << std::endl;
           this->inputSwitch->pushAudio(audioOutFrame, this->inputId);
         }
         av_frame_unref(this->audioOutFrame);
 
       } else if (rtmpPacket.stream_index == this->Input::videoStream->index) {
-
         ret = this->videoDecoder->sendPacket(&rtmpPacket, &videoOutFrame);
         if (ret < 0 && ret != AVERROR(EAGAIN)) {
           this->stop();
           break;
         };
 
-        vLog << "PTS: " << videoOutFrame->pts << " " << videoOutFrame->time_base.den << " | " << audioOutFrame->time_base.num << std::endl;
+        if (videoOutFrame->best_effort_timestamp < this->getStartTime()) {
+          av_frame_unref(videoOutFrame);
+          continue;
+        }
 
         if (ret == 0) {
+          rtmpVLog << videoOutFrame->pts << "," << videoOutFrame->pkt_dts << "," << videoOutFrame->best_effort_timestamp << "," << videoOutFrame->pkt_duration << std::endl;
           this->inputSwitch->pushVideo(videoOutFrame, this->inputId);
         }
         av_frame_unref(this->videoOutFrame);

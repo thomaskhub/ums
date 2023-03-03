@@ -1,9 +1,12 @@
 #include "inputSwitch.h"
 
+std::ofstream vLog("/tmp/videFilterOut.txt");
+std::ofstream aLog("/tmp/audioFilterOut.txt");
+
 int InputSwitch::pushAudio(AVFrame *frame, int inputId) {
   int ret;
+  aLog << frame->pts << " " << frame->pkt_dts << " " << frame->best_effort_timestamp << " " << frame->nb_samples << "" << frame->pkt_duration << std::endl;
   for (int i = 0; i < this->audioEncCnt; i++) {
-
     frame->pts = this->audioPts;
     frame->pkt_dts = this->audioPts;
     frame->best_effort_timestamp = this->audioPts;
@@ -18,8 +21,9 @@ int InputSwitch::pushAudio(AVFrame *frame, int inputId) {
 
 int InputSwitch::pushVideo(AVFrame *frame, int inputId) {
   int ret;
+  vLog << frame->pts << " " << frame->pkt_dts << " " << frame->best_effort_timestamp << " " << std::endl;
+
   for (int i = 0; i < this->videoEncCnt; i++) {
-    // TODO: PTS must be set properly
 
     frame->pts = this->videoPts;
     frame->pkt_dts = this->videoPts;
