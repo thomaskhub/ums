@@ -54,7 +54,7 @@ static int openDash(DashCtxT *data, AVCodecContext **encoderCtx,
   av_dict_set(&opts, "hls_playlist", "1", 0);
 
   if (global.dvr == 0) {
-    av_dict_set(&opts, "window_size", "15", 0);
+    av_dict_set(&opts, "window_size", "0", 0);
   }
 
   av_dict_set(&opts, "dash_segment_type", "mp4", 0);
