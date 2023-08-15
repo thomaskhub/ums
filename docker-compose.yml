@@ -1,0 +1,27 @@
+version: "3"
+
+services:
+  ums:
+    build:
+      context: .
+      target: base
+    container_name: "ums-builder"
+    restart: on-failure
+    command: ["sleep", "10000"]
+    ports:
+      - 8080:80
+    volumes:
+      - .:/source
+    networks:
+      - bridge
+  
+  nginx-rtmp:
+    image: ums-nginx-rtmp-thomas
+    container_name: ums-rtmp-thomas
+    ports:
+      - 1935:1935
+    networks:
+      - bridge
+
+networks:
+  bridge:

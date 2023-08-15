@@ -306,10 +306,10 @@ int validateInput() {
   if (doorOpen == NULL)
     getNowAsIso(&sessionEnd);
 
-  if (!startsWith(rtmpInUrl, "rtmp://") && !startsWith(rtmpInUrl, "rtmps://")) {
-    printf("Error: rtmpInUrl is not a valid rtmp url --> %s\n", rtmpInUrl);
-    return -1;
-  }
+//  if (!startsWith(rtmpInUrl, "rtmp://") && !startsWith(rtmpInUrl, "rtmps://")) {
+//    printf("Error: rtmpInUrl is not a valid rtmp url --> %s\n", rtmpInUrl);
+//    return -1;
+//  }
 
   if (rtmpOutUrl != NULL) {
     if (!startsWith(rtmpOutUrl, "rtmp://") && !startsWith(rtmpOutUrl, "rtmps://")) {
