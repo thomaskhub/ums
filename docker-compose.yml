@@ -5,7 +5,7 @@ services:
     build:
       context: .
       target: base
-    container_name: "ums-builder"
+    container_name: "ums-server"
     restart: on-failure
     command: ["sleep", "10000"]
     ports:
@@ -15,9 +15,9 @@ services:
     networks:
       - bridge
   
-  nginx-rtmp:
-    image: ums-nginx-rtmp-thomas
-    container_name: ums-rtmp-thomas
+  rtmp-server:
+    image: ums-rtmp-server
+    container_name: ums-rtmp-server
     ports:
       - 1935:1935
     networks:

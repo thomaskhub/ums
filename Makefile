@@ -14,19 +14,19 @@ debug:
 	-lpthread `pkg-config --libs libavcodec libavutil libavformat libavfilter libswresample libswscale --cflags` \
 	-ljansson \
 	-lpaho-mqtt3c 
-	
-test-video:
-	./ums --rtmpIn ./test/data/short.mp4 \
-		--rtmpOut rtmp://nginx-rtmp/live/output \
+
+test-file:
+	./ums --rtmpIn $(if $(VIDEO) ,$(VIDEO), ./test/data/short30s.mp4) \
+		--rtmpOut rtmp://rtmp-server/live/output \
 		--dash ./test/dash \
 		--rec ./test/rec \
 		--preFiller ./test/data/english-pre-filler.jpg \
 		--sessionFiller ./test/data/english-session-filler.jpg \
 		--postFiller ./test/data/english-post-filler.jpg
 
-test-live:
-	./ums --rtmpIn rtmp://nginx-rtmp:1935/live/input \
-		--rtmpOut rtmp://nginx-rtmp/live/output \
+test-rtmp:
+	./ums --rtmpIn rtmp://rtmp-server:1935/live/input \
+		--rtmpOut rtmp://rtmp-server/live/output \
 		--dash ./test/dash \
 		--rec ./test/rec \
 		--preFiller ./test/data/english-pre-filler.jpg \
