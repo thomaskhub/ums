@@ -102,14 +102,45 @@ docker run --name ums-prod --rm -e mode:live  thomaskhub/ums:latest
 
 ## Setup
 
-- ensure the docker container is started (instructions see above)
-- install mpv player
-  ```bash
-  sudo apt install mpv
+- Create a docker image with RTMP server
+  ```sh
+  git clone https://github.com/thomaskhub/nginx-rtmp && cd nginx-rtmp 
+  docker build -t ums-rtmp-server .
   ```
-- clone ![ums-test-utils](https://github.com/thomaskhub/ums-test-utils) repo
-- change TEST_BIN_PATH variable test/config.sh to point to the cloned ums-test-repo
-- build the ums application with `make` command
+- Build ums script
+  ```sh
+  docker compose up
+  # now open second terminal
+  docker exec -it ums-server bash
+  make build  # execute this from inside of container
+  ```
+
+- Install mpv player using:
+  ```sh
+  sudo apt install mpv  # Linux
+  brew install mpv  # macOS
+  ```
+
+## Running the Tests
+All tests bellow you can run inside of `ums-server` container.
+
+You can test `ums` with rtmp input via
+```sh
+make test-rtmp
+```
+And fro video file input:
+```sh
+make test-file
+make test-file VIDEO=./path/to/video.mp4  # or you can provide custom video
+```
+
+You can check outpu via
+```sh
+mpv rtmp://localhost/live/output
+```
+
+# Outdated Testing Info
+
 - go into the ./test directory and execute the available tests
 
   - check_test_setup.sh

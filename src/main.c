@@ -248,6 +248,11 @@ int startsWith(const char *a, const char *b) {
   return 0;
 }
 
+int isInputFromFile() {
+  if (startsWith(rtmpInUrl, "./") || startsWith(rtmpInUrl, "/")) return 1;
+  return 0;
+}
+
 /**
  * @brief input validation
  * depending on the operating mode we will check if all parameters are set
@@ -306,10 +311,10 @@ int validateInput() {
   if (doorOpen == NULL)
     getNowAsIso(&sessionEnd);
 
-  if (!startsWith(rtmpInUrl, "rtmp://") && !startsWith(rtmpInUrl, "rtmps://")) {
-    printf("Error: rtmpInUrl is not a valid rtmp url --> %s\n", rtmpInUrl);
-    return -1;
-  }
+//  if (!startsWith(rtmpInUrl, "rtmp://") && !startsWith(rtmpInUrl, "rtmps://")) {
+//    printf("Error: rtmpInUrl is not a valid rtmp url --> %s\n", rtmpInUrl);
+//    return -1;
+//  }
 
   if (rtmpOutUrl != NULL) {
     if (!startsWith(rtmpOutUrl, "rtmp://") && !startsWith(rtmpOutUrl, "rtmps://")) {

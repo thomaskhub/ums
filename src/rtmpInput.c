@@ -14,6 +14,7 @@ volatile static int rtmpRunning = 0;
 
 extern volatile GlobalT global;
 
+extern int isInputFromFile();
 void rtmpInputStop() { runThread = 0; }
 void rtmpInputJoin() { pthread_join(inputThread, NULL); }
 
@@ -346,7 +347,8 @@ void *worker(void *data) {
       firstAudioFrame = 1;
     }
 
-    ret = 0; // make sure we restart the loop
+    ret = 0; // we restart the loop if input is rtmp
+    if (isInputFromFile() == 1) rtmpInputStop();
   }
 
   // Free all resource if rtmp input is stopepd which should never happen but

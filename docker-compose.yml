@@ -1,0 +1,27 @@
+version: "3"
+
+services:
+  ums:
+    build:
+      context: .
+      target: base
+    container_name: "ums-server"
+    restart: on-failure
+    command: ["sleep", "10000"]
+    ports:
+      - 8080:80
+    volumes:
+      - .:/source
+    networks:
+      - bridge
+  
+  rtmp-server:
+    image: ums-rtmp-server
+    container_name: ums-rtmp-server
+    ports:
+      - 1935:1935
+    networks:
+      - bridge
+
+networks:
+  bridge:
