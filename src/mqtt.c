@@ -2,7 +2,6 @@
 #include <libavutil/log.h>
 
 Mqtt *internalContext;
-
 void parseMessage(const char *msg) {
   json_error_t error;
   json_t *root = json_loads(msg, 0, &error);
@@ -15,7 +14,6 @@ void parseMessage(const char *msg) {
       json_object_foreach(root, key, value) {
         if (strcmp("cmd", key) == 0) { // when stop command receive exit the app
           av_log(NULL, AV_LOG_DEBUG, "Stop command received\n");
-
           char payload[512];
           sprintf(payload, "{\"cmd\":\"stopping\",\"payload\":{\"sessionId\":\"%s\"}}", getenv("sessionId"));
 
@@ -107,6 +105,7 @@ void mqttStart(Mqtt *context, char *mqttUrl) {
   conn_opts.username = context->mqttId;
   conn_opts.password = context->mqttToken;
   context->options = conn_opts;
+  
   internalContext = context;
 
   while (1) {

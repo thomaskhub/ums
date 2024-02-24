@@ -102,10 +102,11 @@ OutputCtxT vOutCfg[] = {
      .outWidth = 384,
      .outHeight = 216,
      .type = AVMEDIA_TYPE_VIDEO},
-    {.bitrate = 50000,
+    {.bitrate = 40000,
      .outWidth = 256,
      .outHeight = 144,
      .type = AVMEDIA_TYPE_VIDEO},
+
 };
 
 AudioEncCtx aOutCfg = {.bitrate = 64000};
@@ -334,6 +335,17 @@ int validateInput() {
   }
   closedir(dir);
 
+  printf("Dash manifest path --> %s\n", dashPath);
+  strcpy(tmpString, dashPath);
+  // dirname(tmpString);
+  dir = opendir(tmpString);
+  if (!dir) {
+    // closedir(dir);
+    printf("Error: dash output directory cannot be opened %s\n", tmpString);
+    return -1;
+  }
+  closedir(dir);
+
   // check if recording path exists
   if (!recordPath) {
     av_log(NULL, AV_LOG_ERROR, "recordPath parameter not defined\n");
@@ -378,6 +390,7 @@ int main(int argc, char **argv) {
     doorOpen = getenv("doorOpen");
     sessionStart = getenv("sessionStart");
     sessionEnd = getenv("sessionEnd");
+    global.dvr = getenv("dvr") == NULL ? 0 : 1;
 
   } else {
 
@@ -499,7 +512,8 @@ int main(int argc, char **argv) {
   dashCtx.streamLen = cfgLength;
   ret = startDash(&dashCtx, dashCodecList, aOutCfg.encCtx);
   if (ret < 0) {
-    av_log(NULL, AV_LOG_ERROR, "main::could not start dash output...");
+    av_log(NULL, AV_LOG_ERROR, "main::could not start dash output... %i\n", ret);
+    exit(1);
   }
 
   ret = inputSwitchInit(switchPushVFrame, switchPushAFrame, rtmpIsRunning,

@@ -1,5 +1,132 @@
 #include "avBuffer.h"
 
+// the pull2, full2, xxxx2 etc. functions have been tested but did not end up
+// in production. We thought the normal buffer has some issues but it was not so.
+// both of them are working. difference is that after calling avBufferPull2 is called
+// the returned frame must be freed by the caller to avoid memory leaks.
+int addAudioSlice(AvBuffer *buf, AVFrame *frame) {
+  AVFrame *slice;
+  int ret;
+  buf->nbSamples = frame->nb_samples;
+
+  slice = av_frame_alloc();
+  if (!frame) {
+    av_log(NULL, AV_LOG_FATAL, "Could not allocate audio slice....\n");
+    exit(1);
+  }
+
+  slice->format = frame->format;
+  slice->nb_samples = frame->nb_samples;
+  slice->channel_layout = frame->channel_layout;
+
+  // av_log(NULL, AV_LOG_ERROR, "Thomas: aFormat %i\n", slice.)
+
+  ret = av_frame_get_buffer(slice, 0);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "addAudioSlice::allocated frame buffer failed\n");
+    exit(1);
+    return ret;
+  }
+
+  ret = av_frame_copy(slice, frame);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "addAudioSlice:: frame could not be copied %i\n", ret);
+    return ret;
+  }
+
+  slice->pkt_dts = frame->pkt_dts;
+  slice->pkt_duration = frame->pkt_duration;
+  slice->pts = frame->pts;
+  buf->buffer[buf->wrPtr] = slice;
+
+  // point to the next element
+  buf->wrPtr = (buf->wrPtr + 1) % FRAME_CNT;
+  return 0;
+}
+
+int addVideoSlice(AvBuffer *buf, AVFrame *frame) {
+  AVFrame *slice;
+  int ret;
+  buf->nbSamples = frame->nb_samples;
+
+  slice = av_frame_alloc();
+  if (!frame) {
+    av_log(NULL, AV_LOG_FATAL, "Could not allocate video slice....\n");
+    exit(1);
+  }
+  slice->format = frame->format;
+  slice->width = frame->width;
+  slice->height = frame->height;
+
+  ret = av_frame_get_buffer(slice, 0);
+  if (ret < 0) {
+    av_log(NULL, AV_LOG_ERROR, "addAudioSlice::allocated frame buffer failed\n");
+    exit(1);
+    return ret;
+  }
+
+  ret = av_frame_copy(slice, frame);
+  if (ret < 0) {
+    return ret;
+  }
+
+  slice->pkt_dts = frame->pkt_dts;
+  slice->pkt_duration = frame->pkt_duration;
+  slice->pts = frame->pts;
+  buf->buffer[buf->wrPtr] = slice;
+
+  // point to the next element
+  buf->wrPtr = (buf->wrPtr + 1) % FRAME_CNT;
+  return 0;
+}
+
+int avBufferPush2(AvBuffer *buf, AVFrame *frame) {
+  if (buf->buffer == NULL) {
+    buf->buffer = malloc(FRAME_CNT * sizeof(AVFrame *));
+    if (!buf->buffer) {
+      av_log(NULL, AV_LOG_FATAL, "Could not allocate doubleBuffer array....\n");
+      exit(1);
+    }
+  }
+
+  if (avBufferFull2(buf)) {
+    av_log(NULL, AV_LOG_WARNING, "avBufferPush2::buffer is full\n");
+    return AVERROR(EAGAIN);
+  }
+
+  if (buf->type == AVMEDIA_TYPE_VIDEO) {
+    return addVideoSlice(buf, frame);
+
+  } else if (buf->type == AVMEDIA_TYPE_AUDIO) {
+    return addAudioSlice(buf, frame);
+
+  } else {
+    av_log(NULL, AV_LOG_ERROR, "avBuffer::unsupported media type\n");
+    exit(1);
+  }
+}
+
+uint8_t avBufferFull2(AvBuffer *buf) {
+  if (!buf->buffer) {
+    return 0;
+  }
+
+  return (buf->wrPtr + 1) % FRAME_CNT == buf->rdPtr;
+}
+
+int avBufferPull2(AvBuffer *buf, AVFrame **frame) {
+  uint8_t empty = buf->wrPtr == buf->rdPtr;
+  // av_log(NULL, AV_LOG_ERROR, "avBufferPull2::try to pull\n");
+  if (empty || !buf->buffer) {
+    // av_log(NULL, AV_LOG_ERROR, "avBufferPull2::video buffer is empty\n");
+    return AVERROR(EAGAIN);
+  }
+  *frame = buf->buffer[buf->rdPtr];
+
+  buf->rdPtr = (buf->rdPtr + 1) % FRAME_CNT;
+  return 0;
+}
+
 int avBufferInit(AvBuffer *buf, uint32_t frameCount, enum AVPixelFormat pixFmt,
                  int width, int height, enum AVSampleFormat smpFmt,
                  int nbSamples, uint64_t channelLayout, enum AVMediaType type) {
@@ -76,11 +203,11 @@ int avBufferPush(AvBuffer *buf, AVFrame *frame) {
   // this way the first frame will decide the buffer frame settings
   if (!buf->buffer) {
     if (buf->type == AVMEDIA_TYPE_VIDEO) {
-      ret = avBufferInit(buf, 3, frame->format, frame->width, frame->height, 0,
+      ret = avBufferInit(buf, 6, frame->format, frame->width, frame->height, 0,
                          0, 0, AVMEDIA_TYPE_VIDEO);
 
     } else if (buf->type == AVMEDIA_TYPE_AUDIO) {
-      ret = avBufferInit(buf, 3, 0, 0, 0, frame->format, frame->nb_samples,
+      ret = avBufferInit(buf, 6, 0, 0, 0, frame->format, frame->nb_samples,
                          frame->channel_layout, AVMEDIA_TYPE_AUDIO);
     }
 
@@ -91,7 +218,7 @@ int avBufferPush(AvBuffer *buf, AVFrame *frame) {
   }
 
   if (full) {
-    av_log(NULL, AV_LOG_WARNING, "avBufferPush2::%s buffer is full\n", t);
+    av_log(NULL, AV_LOG_WARNING, "avBufferPush::%s buffer is full\n", t);
     return AVERROR(EAGAIN);
   }
 

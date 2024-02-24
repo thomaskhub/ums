@@ -84,7 +84,7 @@ void *worker(void *data) {
     avBufferClear(&rtmpInABuffer);
     avBufferClear(&rtmpInVBuffer);
 
-    ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo, 0, 0);
+    ret = openInput(&inFmtCtx, (char *)wData.url, &inputAudio, &inputVideo, 0, 0, 1, 1);
     if (ret < 0) {
       av_log(NULL, AV_LOG_DEBUG,
              "rtmpInput::Could not open rtmp input %i  url --> %s\n", ret,
@@ -299,6 +299,8 @@ void *worker(void *data) {
               goto freeAll;
             }
 
+            // we can push here because we checked before that we have at least
+            // one free space so this should never fail.
             ret = avBufferPush(&rtmpInVBuffer, videoOutFrame);
             if (ret < 0) {
               av_log(NULL, AV_LOG_DEBUG,

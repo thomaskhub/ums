@@ -3,7 +3,8 @@
 void closeInput(AVFormatContext **inFmtCtx) { avformat_close_input(inFmtCtx); }
 
 int openInput(AVFormatContext **inFmtCtx, char *filename, AVStream **audioStream,
-              AVStream **videoStream, AVInputFormat *fmt, AVDictionary **opts) {
+              AVStream **videoStream, AVInputFormat *fmt, AVDictionary **opts,
+              uint8_t hasAudio, uint8_t hasVideo) {
   int ret, i;
   int foundAudio = 0;
   int foundVideo = 0;
@@ -46,9 +47,9 @@ int openInput(AVFormatContext **inFmtCtx, char *filename, AVStream **audioStream
     }
   }
 
-  if (!audioStream || !videoStream) {
+  if ((hasAudio && *audioStream == NULL) || (hasVideo && *videoStream == NULL)) {
     closeInput(inFmtCtx);
-    return AVERROR_STREAM_NOT_FOUND;
+    return AVERROR(EIO);
   }
 
   return 0;

@@ -11,7 +11,7 @@ int getFrameFromImage(AVFormatContext **ctx, char *path,
   AVPacket *pkt;
   struct SwsContext *swsCtx;
 
-  ret = openInput(ctx, path, &audioStream, &videoStream, 0, 0);
+  ret = openInput(ctx, path, &audioStream, &videoStream, 0, 0, 0, 1);
   if (ret < 0) {
     av_log(NULL, AV_LOG_ERROR,
            "utils::getFrameFromImage::could not open file\n");
@@ -365,11 +365,11 @@ void rescaleVideoFrame(AVFrame *frame) {
   frame->pkt_duration = av_rescale(frame->pkt_duration, VIDEO_TIMEBASE_DEN, TIMEBASE_DEN);
 }
 
-void rescaleAudioFrame(AVFrame *frame) {
-  frame->pts = av_rescale(frame->pts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
-  frame->pkt_dts = av_rescale(frame->pkt_dts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
-  frame->pkt_duration = av_rescale(frame->pkt_duration, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
-}
+// void rescaleAudioFrame(AVFrame *frame) {
+//   frame->pts = av_rescale(frame->pts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+//   frame->pkt_dts = av_rescale(frame->pkt_dts, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+//   frame->pkt_duration = av_rescale(frame->pkt_duration, AUDIO_TIMEBASE_DEN, TIMEBASE_DEN);
+// }
 
 void setAudioDelay(AVFilterGraph *graph, uint32_t delay) {
   char args[128];
